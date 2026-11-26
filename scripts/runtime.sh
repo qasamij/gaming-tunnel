@@ -35,8 +35,13 @@ elif [[ $role == exit ]]; then
   [[ -f $STATE ]] || exit 0
   SUBNET=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["client_subnet"])' "$STATE")
   WAN=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("wan",""))' "$STATE")
+  PEER=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("tunnel_peer",""))' "$STATE")
   [[ -n $WAN ]] || WAN=$(ip route show default | awk '/default via/{print $5; exit}')
   [[ -n $WAN ]] || exit 0
+  # Without these routes, return traffic (including UDP echo replies) exits
+  # through the WAN instead of going back into the tunnel.
+  ip route replace "$SUBNET" dev omawg0
+  [[ -n $PEER ]] && ip route replace "$PEER/32" dev omawg0
   iptables -t nat -C POSTROUTING -s "$SUBNET" -o "$WAN" -j MASQUERADE 2>/dev/null || \
     iptables -t nat -A POSTROUTING -s "$SUBNET" -o "$WAN" -j MASQUERADE
   iptables -C FORWARD -s "$SUBNET" -o "$WAN" -j ACCEPT 2>/dev/null || \

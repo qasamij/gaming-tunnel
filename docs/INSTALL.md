@@ -46,6 +46,16 @@ omclient0     BBBB...
 
 > نکته: کلیدهای خصوصی در `/etc/1mobile-runtime/keys/` با مجوز `600` میمانند و از سرور خارج نمیشوند.
 
+برای وارد کردن سادهٔ کلیدها روی هر سرور (مثلاً بعد از تعویض VPS)، به جای تکرار مراحل دستی از این دستورها استفاده کنید:
+
+```bash
+sudo bash scripts/install.sh keys show              # کلیدهای عمومی این سرور
+sudo bash scripts/install.sh keys import iran       # یا: import exit
+sudo bash scripts/install.sh persist                # بررسی پایداری بعد از ریبوت
+```
+
+جزئیات کامل: [docs/KEYS.md](KEYS.md). رمز ادمین نیز به صورت هش Argon2id/scrypt ذخیره میشود، نه متن ساده.
+
 ## 2) Exit را پیکربندی کنید
 
 ```bash
@@ -58,10 +68,13 @@ sudo bash scripts/install.sh fresh exit
 2. `omawg0.pub` مربوط به Iran
 3. پورت تانل Iran (`51821` پیشفرض)
 4. سابنت کلاینتها (`10.7.0.0/24` پیشفرض)
+5. خط مبهمسازی Iran (`Jc=... H1=...`) — فقط اگر `network.json` را کپی نکردهاید؛ یک بار پرسیده و ذخیره میشود.
 
 اسکریپت:
 
-- `omawg0` با آدرس `10.9.0.1/30` میسازد.
+- `omawg0` با آدرس `10.9.0.1/30` میسازد و لینک را `up` میکند.
+- در `AllowedIPs` peer Iran علاوه بر سابنت کلاینتها، `10.9.0.2/32` را هم میگذارد تا پاسخ UDP probe برگردد.
+- routeهای `10.7.0.0/24` و `10.9.0.2/32` را به سمت `omawg0` اضافه میکند.
 - `ip_forward` و MASQUERADE را به رابط default route اضافه میکند.
 - سرویس UDP echo را روی `10.9.0.1:5355` نصب میکند.
 - supervisor را با `role=exit` نصب میکند.
@@ -94,9 +107,9 @@ sudo bash scripts/install.sh fresh iran
 sudo JUNK_COUNT=0 bash scripts/install.sh fresh iran
 ```
 
-## 4) کلید سرور را به پنل معرفی کنید
+## 4) کلید سرور در پنل (خودکار)
 
-پنل هنگام ساخت کاربر، فایل `/etc/1mobile-client/server.pub` را میخواند. در نصب fresh آن کلید همان `omclient0.pub` است:
+پنل هنگام ساخت کاربر، فایل `/etc/1mobile-client/server.pub` را میخواند. نصب fresh و `keys import iran` آن را از `omclient0.pub` کپی میکنند. اگر سرور قدیمی است یا کلید را عوض کردهاید، دستی:
 
 ```bash
 sudo install -d -m 700 /etc/1mobile-client
@@ -110,6 +123,18 @@ sudo systemctl restart 1mobile-panel
 2. رمز و کد TOTP را وارد کنید (TOTP هنگام نصب چاپ شد).
 3. تب **کاربران** → نام کاربر، اعتبار (روز) و سهمیه (GiB) → **ساخت**.
 4. لینک **کانفیگ** یا **QR** را بگیرید و در کلاینت AmneziaWG وارد کنید.
+
+## پایداری بعد از ریبوت و بستن SSH
+
+تانل توسط سرویس systemd اداره میشود و به نشست SSH وابسته نیست. آدرسها در `/etc/1mobile-runtime/<iface>.addr` و تنظیمات در `<iface>.conf` ذخیرهاند؛ supervisor بعد از ریبوت اینترفیسها را میسازد، آدرسها را میدهد، لینک را `up` میکند و مسیرها/NAT را دوباره اعمال میکند.
+
+بررسی و ترمیم یک مرحلهای:
+
+```bash
+sudo bash scripts/install.sh persist
+```
+
+این دستور سرویسها را `enable` میکند، وجود فایلهای ذخیرهشده را چک میکند و وضعیت نهایی را نشان میدهد. جزئیات: [docs/KEYS.md](KEYS.md).
 
 ## ارتقا از نصب قدیمی
 
@@ -138,6 +163,7 @@ sudo awg show omclient0
 sudo awg show omawg0
 sudo ip rule show | grep 179
 sudo systemctl status 1mobile-panel 1mobile-runtime
+sudo bash scripts/install.sh persist        # بررسی enable/active و فایلهای ذخیرهشده
 curl -k https://127.0.0.1:9443/metrics      # با کوکی نشت نیاز به ورود دارد
 ```
 

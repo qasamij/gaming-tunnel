@@ -50,6 +50,12 @@ class MonitorTests(unittest.TestCase):
             stop.set()
             server.close()
 
+    def test_loss_percent_uses_the_whole_window(self):
+        self.assertIsNone(monitor.loss_percent([]))
+        self.assertEqual(monitor.loss_percent([True, True, True]), 0.0)
+        self.assertAlmostEqual(monitor.loss_percent([True, False, True, False]), 50.0)
+        self.assertAlmostEqual(monitor.loss_percent([False]), 100.0)
+
     def test_snapshot_enriches_users(self):
         result = monitor.snapshot({
             "PUB": {"name": "client01", "used": 1024, "enabled": True,

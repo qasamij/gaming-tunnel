@@ -88,7 +88,14 @@ if [[ -z $PASSWORD ]]; then
   [[ $PASSWORD == "$PASSWORD2" ]] || fail 'Passwords do not match'
 fi
 [[ ${#PASSWORD} -ge 10 ]] || fail 'Password must be at least 10 characters'
-printf '%s\n' "$PASSWORD" > "$DATA_DIR/password"
+# Store a salted Argon2id/scrypt hash, never the plaintext password.
+HASHED=$(PYTHONPATH="$REPO_DIR/src" PANEL_PASSWORD="$PASSWORD" python3 - <<'PY'
+import os
+from passwords import hash_password
+print(hash_password(os.environ['PANEL_PASSWORD']))
+PY
+)
+printf '%s\n' "$HASHED" > "$DATA_DIR/password"
 
 TOTP=$(python3 -c 'import base64,secrets; print(base64.b32encode(secrets.token_bytes(20)).decode().rstrip("="))')
 printf '%s\n' "$TOTP" > "$DATA_DIR/totp-secret"

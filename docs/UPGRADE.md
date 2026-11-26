@@ -57,7 +57,7 @@ sudo CONFIRM=1 bash scripts/install.sh uninstall
 
 ## تغییر نسخه بعدی
 
-1. tag بزنید: `git tag -a v1.4.0 -m "Release 1.4.0"` و `git push --tags`.
+1. tag بزنید: `git tag -a v1.4.1 -m "Release 1.4.1"` و `git push --tags`.
 2. فایلها را در سرور بهروز کنید و دوباره `install.sh monitor` بزنید.
 3. تستها را اجرا کنید: `make test`.
 

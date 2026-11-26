@@ -22,7 +22,7 @@ from pathlib import Path
 import monitor
 import ops
 
-VERSION = "1.4.0"
+VERSION = "1.4.1"
 os.umask(0o077)
 
 D = Path(os.getenv("PANEL_DATA", "/etc/1mobile-panel"))
@@ -41,6 +41,14 @@ _CIDR_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}/32\b")
 
 def password():
     return (D / "password").read_text().strip()
+
+
+def store_password_hash(encoded):
+    """Atomically replace the legacy plaintext password with a salted hash."""
+    target = D / "password"
+    tmp = target.with_suffix(".tmp")
+    tmp.write_text(str(encoded).strip() + "\n")
+    tmp.replace(target)
 
 
 def totp_secret():
@@ -128,7 +136,10 @@ def reconcile():
                 try:
                     run(AWG, "set", "omclient0", "peer", pub, "remove")
                 except Exception:
-                    pass
+                    # Keep the user marked enabled: the peer is still in the
+                    # live tunnel, so disabling it in the panel would lie.
+                    # The next worker cycle retries the removal.
+                    continue
                 user["enabled"] = False
                 user["last"] = 0
                 changed = True
@@ -289,7 +300,8 @@ def action(q):
         try:
             run(AWG, "set", "omclient0", "peer", pub, "remove")
         except Exception:
-            pass
+            # Do not touch panel state when the tunnel still has the peer.
+            raise ValueError("Could not remove peer from tunnel; retry")
         user["enabled"] = False
         user["last"] = 0
         if act == "delete":

@@ -25,8 +25,9 @@ from urllib.parse import parse_qs, urlsplit
 import backend as b
 import monitor
 import ops
+import passwords
 
-VERSION = "1.4.0"
+VERSION = "1.4.1"
 BASE = Path(__file__).resolve().parent
 STATIC = BASE / "static"
 
@@ -256,9 +257,9 @@ class H(BaseHTTPRequestHandler):
                          totp(b.totp_secret(), t), q.get("otp", ""))),
                     None,
                 )
+                stored = b.password()
                 try:
-                    password_ok = hmac.compare_digest(
-                        b.password().encode(), q.get("password", "").encode())
+                    password_ok = passwords.verify(q.get("password", ""), stored)
                 except Exception:
                     password_ok = False
                 if not password_ok or used is None:
@@ -266,6 +267,9 @@ class H(BaseHTTPRequestHandler):
                     return self.login("رمز یا کد نامعتبر", 401)
                 last_otp = used
                 attempts.pop(ip, None)
+                if passwords.needs_upgrade(stored):
+                    b.store_password_hash(
+                        passwords.hash_password(q.get("password", "")))
                 sid = secrets.token_urlsafe(32)
                 sessions[sid] = [secrets.token_urlsafe(32), now + 900, now + 28800]
             cookie = "sid={}; {}".format(sid, COOKIE_ATTRS)

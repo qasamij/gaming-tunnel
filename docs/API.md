@@ -12,7 +12,7 @@
 
 ```json
 {
-  "version": "1.4.0",
+  "version": "1.4.1",
   "now": 1764163200.12,
   "endpoint": "203.0.113.10",
   "history": [
@@ -27,8 +27,9 @@
   },
   "latency": {
     "rtt": 18.4, "avg": 19.1, "min": 17.2, "max": 22.0,
-    "jitter": 1.3, "loss": 0.0, "target": "10.9.0.1:5355",
-    "mode": "udp", "t": 1764163195.0
+    "jitter": 1.3, "loss": 5.0, "target": "10.9.0.1:5355",
+    "mode": "udp", "t": 1764163195.0,
+    "probes": 20, "ok": 19
   },
   "users": {
     "PUBKEY": {"name": "client01", "used": 10485760, "enabled": true,
@@ -43,8 +44,10 @@
 | `history[].up` | کل آپلود کاربران بیت بر ثانیه |
 | `row.down` / `row.up` | دانلود/آپلود همان peer |
 | `row.rx` / `row.tx` | شمارنده تجمعی AWG (rx = آپلود کاربر، tx = دانلود کاربر) |
-| `latency.avg` | میانگین 30 RTT آخر |
+| `latency.avg` | میانگین 30 RTT موفق آخر |
 | `latency.jitter` | میانگین انحراف مطلق از میانگین |
+| `latency.loss` | درصد اتلاف روی پنجرهٔ ۲۰ تلاش اخیر (`5.0` یعنی ۱ از ۲۰ probe ناموفق) |
+| `latency.probes` / `latency.ok` | تعداد تلاشها و تعداد پاسخهای موفق همان پنجره |
 
 ## POST `/login`
 

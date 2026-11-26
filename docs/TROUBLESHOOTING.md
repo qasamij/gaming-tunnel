@@ -81,6 +81,37 @@ PY
 
 اگر `probe_host` خالی باشد، پنل به ICMP تانل برمیگردد و ممکن است با `/32` بودن omawg0 عددی نشان ندهد.
 
+## تانل بعد از ریبوت / بستن SSH بالا نیست
+
+```bash
+sudo bash scripts/install.sh persist
+sudo ls -l /etc/1mobile-runtime/*.addr /etc/1mobile-runtime/*.conf
+sudo bash /opt/1mobile-runtime/apply-iface.sh omawg0
+sudo bash /opt/1mobile-runtime/runtime.sh
+sudo ip addr show dev omawg0
+sudo ip link show dev omawg0
+```
+
+`persist` سرویسها را دوباره `enable` میکند و فایلهای ذخیرهشده را چک میکند. اگر `.addr` گم شده باشد، `install.sh runtime` آن را از اینترفیس زنده میخواند؛ در غیر این صورت `keys import <role>` یا `fresh <role>` را اجرا کنید. جزئیات: [docs/KEYS.md](KEYS.md).
+
+## خطای `awg setconf` هنگام نصب fresh
+
+قالب جدید مقادیر مبهمسازی را بررسی کنید:
+
+```bash
+cat /etc/1mobile-runtime/obfuscation.txt
+```
+
+باید نه خط، هر خط به شکل `Jc = 3` و شامل ۹ کلید `Jc..H4` باشد. اگر مقادیر را با فاصله حول `=` چسباندهاید اشکالی ندارد؛ تابع `obfuscation_lines` آنها را نرمال میکند. خطوط جداگانهٔ `=` یا عدد تنها نباید وجود داشته باشند.
+
+## Loss همیشه صفر یا غیرواقعی است
+
+`latency.loss` اکنون از پنجرهٔ آخرین ۲۰ تلاش UDP محاسبه میشود. فیلدهای `probes` و `ok` در `/metrics` تعداد تلاشها و پاسخهای موفق را نشان میدهند. اگر `probes` کوچک است، worker تازه راهاندازی شده است. `loss=100` یعنی سرور echo روی Exit یا route برگشتی `10.9.0.2/32` مشکل دارد.
+
+## رمز قدیمی پس از ارتقا کار میکند؟
+
+بله. محتوای فایل `password` اگر با `argon2id$` یا `scrypt$` شروع نشود، به عنوان رمز قدیمی پذیرفته و پس از اولین ورود موفق خودبهخود هش میشود.
+
 ## Supervisor وارد restart loop شده
 
 پیام:

@@ -23,9 +23,8 @@ while true; do
       test -s "$D/$i.conf" || { echo "Missing saved config for $i" >&2; exit 1; }
       repair=1
       echo "Recreating $i at $(date -Is)" >&2
-      amneziawg-go "$i"
-      if ! awg setconf "$i" "$D/$i.conf"; then
-        ip link delete "$i" || true
+      if ! bash /opt/1mobile-runtime/apply-iface.sh "$i"; then
+        echo "Failed to restore $i from saved config" >&2
         exit 1
       fi
     fi

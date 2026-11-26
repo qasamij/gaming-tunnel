@@ -78,6 +78,21 @@ class BackendTests(unittest.TestCase):
         self.assertFalse(b.load()["client01"]["enabled"])
         self.assertTrue(any("remove" in str(call) for call in self.calls))
 
+    def test_reconcile_keeps_enabled_when_peer_removal_fails(self):
+        b.create({"name": "client01", "days": "0", "quota": "0"})
+        users = b.load()
+        users["client01"]["expires"] = time.time() - 1
+        b.save(users)
+
+        def broken(*args, **kwargs):
+            if "remove" in args:
+                raise RuntimeError("awg failed")
+            return ""
+
+        with patch.object(b, "run", side_effect=broken):
+            b.reconcile()
+        self.assertTrue(b.load()["client01"]["enabled"])
+
 
 if __name__ == "__main__":
     unittest.main()

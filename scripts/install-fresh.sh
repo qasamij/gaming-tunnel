@@ -42,15 +42,34 @@ tmp = target.with_suffix('.json.tmp'); tmp.write_text(json.dumps(cfg, indent=2))
 PY
 fi
 
-OBF=""
-if [[ -f "$DATA_DIR/network.json" ]]; then
-  OBF=$(python3 - "$DATA_DIR/network.json" <<'PY'
-import json, sys
-o = json.load(open(sys.argv[1])).get('obfuscation', {})
-print(' '.join('{} = {}'.format(k, o[k]) for k in ('Jc','Jmin','Jmax','S1','S2','H1','H2','H3','H4')))
+# On Exit there is no network.json unless it was copied from Iran, so ask once
+# and remember the answer for future re-installs / key imports.
+if [[ $ROLE == exit && ! -s "$RUNTIME_DIR/obfuscation.txt" && ! -f "$DATA_DIR/network.json" ]]; then
+  read -rp 'Obfuscation line from Iran (Jc=... H1=...), paste exactly: ' OBF_INPUT
+  printf '%s\n' "$OBF_INPUT" > "$RUNTIME_DIR/obfuscation.txt"
+fi
+
+OBF_LINES=""
+if [[ -s "$RUNTIME_DIR/obfuscation.txt" ]]; then
+  OBF_LINES=$(PYTHONPATH="$REPO_DIR/src" OBF_TEXT="$(cat "$RUNTIME_DIR/obfuscation.txt")" \
+    python3 - <<'PY'
+import os
+from keyutil import obfuscation_lines
+print(obfuscation_lines(os.environ['OBF_TEXT']))
+PY
+)
+elif [[ -f "$DATA_DIR/network.json" ]]; then
+  OBF_LINES=$(PYTHONPATH="$REPO_DIR/src" OBF_JSON="$DATA_DIR/network.json" \
+    python3 - <<'PY'
+import json, os
+from keyutil import obfuscation_lines
+print(obfuscation_lines(json.load(open(os.environ['OBF_JSON']))['obfuscation']))
 PY
 )
 fi
+[[ -n $OBF_LINES ]] || fail 'Obfuscation values are missing; rerun on Iran or paste them on Exit'
+printf '%s\n' "$OBF_LINES" > "$RUNTIME_DIR/obfuscation.txt"
+chmod 600 "$RUNTIME_DIR/obfuscation.txt"
 
 write_iface() {
   local name=$1 file=$2 priv=$3 addr=$4 port=$5 peer_pub=$6 allowed=$7 endpoint=$8
@@ -59,7 +78,7 @@ write_iface() {
     echo "PrivateKey = $priv"
     echo "Address = $addr"
     echo "ListenPort = $port"
-    echo "$OBF" | tr ' ' '\n'
+    printf '%s\n' "$OBF_LINES"
     if [[ -n $peer_pub ]]; then
       echo
       echo '[Peer]'
@@ -71,25 +90,20 @@ write_iface() {
     echo
   } > "$file"
   chmod 600 "$file"
+  printf '%s\n' "$addr" > "$RUNTIME_DIR/$name.addr"
+  chmod 600 "$RUNTIME_DIR/$name.addr"
 }
 
 start_iface() {
   local iface=$1 file=$2
-  if awg show "$iface" public-key >/dev/null 2>&1; then
-    info "Applying config to existing $iface"
-    awg setconf "$iface" "$file"
-  else
-    ip link show "$iface" >/dev/null 2>&1 && fail "$iface exists but AWG is unavailable"
-    amneziawg-go "$iface"
-    awg setconf "$iface" "$file"
-  fi
   cp -a "$file" "$RUNTIME_DIR/$iface.conf"
+  bash "$REPO_DIR/scripts/apply-iface.sh" "$iface"
+  info "$iface up: $(awg show "$iface" public-key)"
 }
 
-install -m 755 "$REPO_DIR/scripts/runtime.sh" /opt/1mobile-runtime/runtime.sh 2>/dev/null || {
-  install -d -m 700 /opt/1mobile-runtime
-  install -m 755 "$REPO_DIR/scripts/runtime.sh" /opt/1mobile-runtime/runtime.sh
-}
+install -d -m 700 /opt/1mobile-runtime
+install -m 755 "$REPO_DIR/scripts/runtime.sh" /opt/1mobile-runtime/runtime.sh
+install -m 700 "$REPO_DIR/scripts/apply-iface.sh" /opt/1mobile-runtime/apply-iface.sh
 
 if [[ $ROLE == iran ]]; then
   read -rp 'Public IPv4 clients will connect to (Iran): ' CLIENT_ENDPOINT
@@ -131,7 +145,10 @@ PY
   fi
   PANEL_PASSWORD="$PASSWORD" PROBE_HOST="$TUNNEL_REMOTE" PROBE_PORT=5355 \
     bash "$REPO_DIR/scripts/bootstrap-panel.sh"
+  install -d -m 700 /etc/1mobile-client
+  install -m 644 "$K/omclient0.pub" /etc/1mobile-client/server.pub
   bash "$REPO_DIR/scripts/install-runtime.sh"
+  bash "$REPO_DIR/scripts/persist.sh"
 
   ok "Iran side ready"
   echo "Give this omclient0 public key to every client config generator: $(cat "$K/omclient0.pub")"
@@ -145,26 +162,30 @@ else
   TUNNEL_LOCAL="${TUNNEL_LOCAL:-10.9.0.1/30}"
   TUNNEL_REMOTE="${TUNNEL_REMOTE:-10.9.0.2}"
 
-  # Reuse the obfuscation values generated on Iran (paste them if on a different host).
-  if [[ -z ${OBF:-} || ! -f "$DATA_DIR/network.json" ]]; then
-    read -rp 'Obfuscation line from Iran (Jc=... H1=...), paste exactly: ' OBF
-  fi
+  # The peer must accept both client traffic and the tunnel probe address,
+  # otherwise the UDP echo reply from 10.9.0.1 cannot be routed back to Iran.
+  ALLOWED="$CLIENT_SUBNET, $TUNNEL_REMOTE/32"
   write_iface omawg0 "$RUNTIME_DIR/omawg0.conf.pending" \
     "$(cat "$K/omawg0.key")" "$TUNNEL_LOCAL" "$IRAN_PORT" \
-    "$IRAN_PUB" "$CLIENT_SUBNET" "$IRAN_IP:$IRAN_PORT"
+    "$IRAN_PUB" "$ALLOWED" "$IRAN_IP:$IRAN_PORT"
   mv "$RUNTIME_DIR/omawg0.conf.pending" "$RUNTIME_DIR/omawg0.conf"
   start_iface omawg0 "$RUNTIME_DIR/omawg0.conf"
 
   WAN=$(ip route show default | awk '/default via/{print $5; exit}')
-  python3 - "$CLIENT_SUBNET" "$WAN" "$RUNTIME_DIR/exit.json" <<'PY'
+  python3 - "$CLIENT_SUBNET" "$WAN" "$TUNNEL_REMOTE" "$RUNTIME_DIR/exit.json" <<'PY'
 import json, sys
 from pathlib import Path
-subnet, wan, target = sys.argv[1:]
-p = Path(target); p.write_text(json.dumps({'client_subnet': subnet, 'wan': wan}, indent=2))
+subnet, wan, peer, target = sys.argv[1:]
+state = {'client_subnet': subnet, 'wan': wan, 'tunnel_peer': peer}
+p = Path(target)
+tmp = p.with_suffix('.json.tmp')
+tmp.write_text(json.dumps(state, indent=2))
+tmp.replace(p)
 PY
   /opt/1mobile-runtime/runtime.sh
   ECHO_HOST="$TUNNEL_LOCAL" PROBE_PORT=5355 bash "$REPO_DIR/scripts/install-echo.sh"
   bash "$REPO_DIR/scripts/install-runtime.sh"
+  bash "$REPO_DIR/scripts/persist.sh"
 
   ok "Exit side ready"
   echo "Give this public key to the Iran installer: $(cat "$K/omawg0.pub")"

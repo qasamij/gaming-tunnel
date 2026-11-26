@@ -16,7 +16,7 @@ import threading
 import time
 from collections import deque
 
-VERSION = "1.4.0"
+VERSION = "1.4.1"
 IFACES = ("omclient0", "omawg0")
 
 lock = threading.RLock()
@@ -24,7 +24,8 @@ history = deque(maxlen=120)          # 120 samples x 2s = 4 minutes
 latest = {}
 latency = {"rtt": None, "avg": None, "min": None, "max": None,
            "jitter": None, "loss": None, "target": "", "mode": "udp", "t": 0}
-_samples = deque(maxlen=30)
+_samples = deque(maxlen=30)          # successful RTTs only
+_attempts = deque(maxlen=20)         # every probe, successful or not
 
 
 def parse(text):
@@ -173,11 +174,32 @@ def probe_once(settings, run=None):
     return result
 
 
+def loss_percent(attempts):
+    """Loss over a window of boolean probe results (None when empty)."""
+    values = list(attempts)
+    if not values:
+        return None
+    return 100.0 * (1.0 - sum(values) / len(values))
+
+
 def probe_worker(settings, run=None, interval=5):
+    """Background RTT loop.
+
+    ``settings`` may be a dict or a callable returning one. ``run`` is only
+    used for the ICMP fallback, never from an HTTP request.
+    """
     while True:
-        result = probe_once(settings, run)
+        cfg = {}
+        try:
+            cfg = settings() if callable(settings) else settings
+            result = probe_once(cfg, run)
+        except Exception:
+            result = {"rtt": None, "mode": "udp", "t": time.time(),
+                      "target": str(cfg.get("probe_host", "")), "error": "probe failed"}
         with lock:
-            if result.get("rtt") is not None:
+            ok = result.get("rtt") is not None
+            _attempts.append(ok)
+            if ok:
                 _samples.append(result["rtt"])
                 values = list(_samples)
                 average = sum(values) / len(values)
@@ -186,11 +208,17 @@ def probe_worker(settings, run=None, interval=5):
                     "min": min(values),
                     "max": max(values),
                     "jitter": sum(abs(v - average) for v in values) / len(values),
-                    "loss": 0.0,
                 })
+            if result.get("mode") == "udp":
+                # Packet loss is measured over a window of real attempts;
+                # a single successful reply must never report 0% loss.
+                result["loss"] = loss_percent(_attempts)
+                result["probes"] = len(_attempts)
+                result["ok"] = sum(_attempts)
             latency.clear()
             latency.update(result)
-        time.sleep(max(1, int(settings.get("probe_interval", interval))))
+        delay = cfg.get("probe_interval", interval) if isinstance(cfg, dict) else interval
+        time.sleep(max(1, int(delay)))
 
 
 def collect_worker(run, awg, settings, interval=2):

@@ -54,7 +54,19 @@ flowchart TD
 
 | مسیر | محتوا | مجوز |
 |---|---|---|
-| `/etc/1mobile-panel/` | password, totp-secret, tls.*, users.json, network.json, backup/ | 700 |
-| `/etc/1mobile-runtime/` | role, keys/, omclient0.conf, omawg0.conf, exit.json | 700 |
+| `/etc/1mobile-panel/` | password (هش Argon2id/scrypt), totp-secret, tls.*, users.json, network.json, backup/ | 700 |
+| `/etc/1mobile-runtime/` | role, keys/, `<iface>.conf`, `<iface>.addr`, obfuscation.txt, exit.json | 700 |
 | `/etc/1mobile-client/server.pub` | کلید عمومی omclient0 | 644 |
 | `/opt/1mobile-web-v13/` | کد پنل + static/ | 755 (کدها 600 بجز udp_echo.py) |
+| `/opt/1mobile-runtime/` | runtime.sh, supervise.sh, apply-iface.sh | 700 |
+
+## بازیابی بعد از ریبوت
+
+`1mobile-runtime.service` فرایند `supervise.sh` را نگه میدارد. این فرایند فقط زمانی که اینترفیس گم شده باشد `apply-iface.sh` را اجرا میکند:
+
+1. `amneziawg-go <iface>` برای ساخت لینک،
+2. `awg setconf` بر روی کانفیگی که خطوط `Address/DNS/MTU/Table` آن حذف شدهاند (wg-quick معمولاً اینها را جداگانه اعمال میکند)،
+3. خواندن آدرسها از `<iface>.addr` و `ip addr add`، سپس `ip link set up`،
+4. اجرای مجدد `runtime.sh` برای policy routing (Iran) یا route/NAT (Exit).
+
+به همین دلیل `awg showconf` (که آدرسها را چاپ نمیکند) نمیتواند باعث از دست رفتن آدرسها بعد از ریبوت شود.
