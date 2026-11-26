@@ -16,7 +16,8 @@
 - **امنیت**: رمز هششده (Argon2id یا scrypt) + TOTP، محدودیت تلاش، session چرخان، CSRF، CSP، TLS 1.2+، فایلهای `600`، نوشتن atomic.
 - **systemd + supervisor هوشمند سلامت**: اگر اینترفیس حذف شود، از کانفیگ و آدرس ذخیرهشده بازسازی میشود؛ اگر زنده باشد ولی handshake کهنه یا UDP probe ناموفق باشد، بعد از ۳ تلاش متوالی تعمیر نرم میکند (Peerهای فعلی حفظ میشوند). تانل به نشست SSH وابسته نیست.
 - **جداسازی نصب مخرب از ارتقا**: `fresh` در حضور تانل موجود متوقف میشود و فقط با `FORCE_FRESH=1` روی سرور آزمایشی قابل اجراست.
-- **شناسایی واقعی AmneziaWG**: وجود executable کافی نیست؛ نصبکننده یک اینترفیس موقت میسازد و کلیدهای مبهمسازی را اعمال میکند. اگر باینری با نام `wg` نصب شده باشد، بهصورت خودکار `/usr/local/bin/awg` به آن متصل میشود (`install.sh awg-check`).
+- **تنظیمات مشترک قبل از نصب**: `fresh-config init` مقادیر مبهمسازی و سابنت را یک بار میسازد و خط `OMAWG_SHARED=...` چاپ میکند؛ سرور دوم با `fresh-config import` همان را میگیرد. بنابراین `fresh exit` و `fresh iran` به ترتیب دلخواه اجرا میشوند.
+- **شناسایی واقعی AmneziaWG**: وجود executable کافی نیست؛ نصبکننده حداکثر یک اینترفیس موقت با نام تصادفی `awgchk…` میسازد و کلیدهای مبهمسازی را اعمال میکند؛ هیچ لینک موجودی دستکاری نمیشود و نتیجهٔ موفق ۲۴ ساعت cache میشود تا در سرور کمحافظه آزمایش تکرار نشود. اگر باینری با نام `wg` نصب شده باشد، بهصورت خودکار `/usr/local/bin/awg` به آن متصل میشود (`install.sh awg-check`).
 - **وارد کردن ساده کلیدها**: `bash install.sh keys show|import iran|exit` روی هر سرور، بدون نیاز به یادداشت دستی مسیرها.
 - **Rollback** کامل سرویسها و مسیر برگشت نصب قدیمی.
 
@@ -43,7 +44,17 @@ cd gaming-tunnel
 sudo INSTALL_AWG=1 bash scripts/install.sh deps
 ```
 
-### 2) تولید کلیدها (روی هر دو VPS)
+### 2) تنظیمات مشترک (روی یک VPS، سپس import روی VPS دوم)
+
+```bash
+sudo bash scripts/install.sh fresh-config init
+# خط چاپشده OMAWG_SHARED=... را به سرور دوم ببرید:
+sudo bash scripts/install.sh fresh-config import 'OMAWG_SHARED=...'
+```
+
+بدون این مرحله، `fresh exit` مقادیر مبهمسازی Iran را ندارد. `JUNK_COUNT=0` هنگام `init` برای کمترین latency handshake اعمال میشود.
+
+### 3) تولید کلیدها (روی هر دو VPS)
 
 ```bash
 sudo bash scripts/install.sh keygen iran   # روی سرور ایران
@@ -52,14 +63,14 @@ sudo bash scripts/install.sh keygen exit   # روی سرور exit
 
 هر دستور کلید عمومی `omawg0.pub` را چاپ میکند؛ آنها را رد و بدل کنید.
 
-### 3) پیکربندی Exit
+### 4) پیکربندی Exit
 
 ```bash
 sudo bash scripts/install.sh fresh exit
 # Iran IP، Iran omawg0.pub، سابنت کلاینتها وارد میشود
 ```
 
-### 4) پیکربندی Iran
+### 5) پیکربندی Iran
 
 ```bash
 sudo bash scripts/install.sh fresh iran
@@ -68,7 +79,7 @@ sudo bash scripts/install.sh fresh iran
 
 سپس `https://<IRAN-IP>:9443/` را باز کنید، TOTP ذخیره شده را در authenticator وارد کنید و اولین کاربر را بسازید.
 
-### 5) بررسی پایداری (بعد از ریبوت / بستن SSH)
+### 6) بررسی پایداری (بعد از ریبوت / بستن SSH)
 
 ```bash
 sudo bash scripts/install.sh persist
@@ -93,7 +104,7 @@ sudo bash scripts/install.sh rollback-runtime
 ## نکته مهم درباره لتنسی
 
 - پنل **هیچگونه speed test** انجام نمیدهد؛ سرعتها از شمارندههای real AWG محاسبه میشوند.
-- `Jc` (junk packet) فقط روی handshake اثر میگذارد. برای کمترین latency handshake، هنگام نصب `JUNK_COUNT=0` بدهید. برای مقاومت DPI پیشفرض `3` است.
+- `Jc` (junk packet) فقط روی handshake اثر میگذارد. برای کمترین latency handshake، هنگام اجرای `fresh-config init` پارامتر `JUNK_COUNT=0` بدهید. برای مقاومت DPI پیشفرض `3` است.
 - RTT اندازهگیری شده، لتنسی تانل است؛ لتنسی نهایی بازی به exit، ISP و مسیر game server هم بستگی دارد.
 
 ## ساختار repository
@@ -103,7 +114,7 @@ src/          backend.py, ops.py, monitor.py, web.py, healthcheck.py, passwords.
 scripts/      نصابها، supervisor، rollback و uninstall
 systemd/      پنل، supervisor و UDP echo
 config/       نمونه network.json و env
-tests/        ۴۳ تست واحد (mocked، بدون نیاز به سرور)
+tests/        ۵۳ تست واحد (mocked، بدون نیاز به سرور)
 docs/         INSTALL / KEYS / TEST-PLAN / PRIVILEGE-SEPARATION / ARCHITECTURE / SECURITY / API / TROUBLESHOOTING
 ```
 
@@ -125,9 +136,9 @@ make test
 
 ## خلاصه انگلیسی / English summary
 
-A lightweight, HTTPS control panel for a fresh two-server **AmneziaWG** gaming tunnel (Iran + Exit). The dashboard shows live total and per-user download/upload speeds, traffic graphs, traffic usage, quota/expiry, handshakes, and UDP RTT/jitter/windowed packet loss. Page loads and `/metrics` never call `awg` or `ping` synchronously — background workers update an in-memory cache every 2s/5s, keeping ping overhead minimal. Passwords are stored as salted Argon2id/scrypt hashes. Includes systemd units, a health-aware reboot-safe supervisor (fresh handshake + end-to-end UDP probe), a guard that refuses `fresh` on a live tunnel, simple key import on either server, rollback/uninstall scripts, 43 unit tests and CI. The installer verifies the AWG engine functionally (as some builds name it `wg`) and publishes a stable `awg` command.
+A lightweight, HTTPS control panel for a fresh two-server **AmneziaWG** gaming tunnel (Iran + Exit). The dashboard shows live total and per-user download/upload speeds, traffic graphs, traffic usage, quota/expiry, handshakes, and UDP RTT/jitter/windowed packet loss. Page loads and `/metrics` never call `awg` or `ping` synchronously — background workers update an in-memory cache every 2s/5s, keeping ping overhead minimal. Passwords are stored as salted Argon2id/scrypt hashes. Includes systemd units, a health-aware reboot-safe supervisor (fresh handshake + end-to-end UDP probe), a guard that refuses `fresh` on a live tunnel, simple key import on either server, rollback/uninstall scripts, 53 unit tests and CI. Shared obfuscation settings are generated before either server is installed (`fresh-config init` / `import`), so `fresh exit` no longer depends on `fresh iran`. The installer verifies the AWG engine functionally (as some builds name it `wg`), using at most one randomly named throwaway interface and caching the result for low-memory hosts, then publishes a stable `awg` command.
 
-Quick start: `INSTALL_AWG=1 bash scripts/install.sh deps` → `bash scripts/install.sh keygen iran|exit` (exchange `omawg0.pub`) → `bash scripts/install.sh fresh exit` → `bash scripts/install.sh fresh iran` → `bash scripts/install.sh persist`. See [docs/INSTALL.md](docs/INSTALL.md), [docs/KEYS.md](docs/KEYS.md) and the mandatory lab checklist in [docs/TEST-PLAN.md](docs/TEST-PLAN.md).
+Quick start: `INSTALL_AWG=1 bash scripts/install.sh deps` → `bash scripts/install.sh fresh-config init` (copy `OMAWG_SHARED=...`, then `import` on the other VPS) → `bash scripts/install.sh keygen iran|exit` (exchange `omawg0.pub`) → `bash scripts/install.sh fresh exit` / `fresh iran` (either order) → `bash scripts/install.sh persist`. See [docs/INSTALL.md](docs/INSTALL.md), [docs/KEYS.md](docs/KEYS.md) and the mandatory lab checklist in [docs/TEST-PLAN.md](docs/TEST-PLAN.md).
 
 ## لایسنس
 

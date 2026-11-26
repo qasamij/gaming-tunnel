@@ -55,11 +55,17 @@ flowchart TD
 | مسیر | محتوا | مجوز |
 |---|---|---|
 | `/etc/1mobile-panel/` | password (هش Argon2id/scrypt), totp-secret, tls.*, users.json, network.json, backup/ | 700 |
-| `/etc/1mobile-runtime/` | role, keys/, `<iface>.conf`, `<iface>.addr`, obfuscation.txt, exit.json | 700 |
+| `/etc/1mobile-runtime/` | role, keys/, `<iface>.conf`, `<iface>.addr`, obfuscation.txt, exit.json, awg.verified (cache آزمایش AWG؛ ۲۴ ساعت) | 700 |
 | `/etc/1mobile-client/server.pub` | کلید عمومی omclient0 | 644 |
 | `/opt/1mobile-web-v13/` | کد پنل + static/ + healthcheck.py, awgdetect.py | 755 (کدها 600 بجز udp_echo.py) |
 | `/opt/1mobile-runtime/` | runtime.sh, supervise.sh, apply-iface.sh, keyutil.py, awgdetect.py | 700 |
 | `/usr/local/bin/awg` | پیوند به باینری تأییدشدهٔ AmneziaWG (`awg` یا `wg`) | 755 |
+
+## تنظیمات مشترک قبل از نصب
+
+`fresh-config init`فایل `network.json` (شامل `H1..H4` و سابنت) را میسازد و خط `OMAWG_SHARED=...` چاپ میکند؛ `fresh-config import` همان خط را روی سرور دوم بازمیگرداند. بنابراین `fresh iran` و `fresh exit` هر دو از یک منبع میخوانند و ترتیب اجرایآنها دلخواه است. `fresh` بدون `network.json` متوقف میشود تا مبهمسازی دو سر ناسازگار نشود.
+
+برای آزمایش موتور AWG، `awgdetect.py` حداکثر یک لینک موقت با نام تصادفی `awgchk…` میسازد، فقط همان را حذف میکند و نتیجهٔ موفق را در `awg.verified` cache میکند تا روی سرور کمحافظه آزمایش تکرار نشود.
 
 ## بازیابی بعد از ریبوت
 

@@ -6,10 +6,32 @@ unit-tested without bash. No third-party dependencies: a WG key is simply
 """
 
 import base64
+import copy
+import ipaddress
+import json
 import re
+import secrets
+from pathlib import Path
 
 _KEY_RE = re.compile(r"^[A-Za-z0-9+/]{43}=$")
 OBFUSCATION_KEYS = ("Jc", "Jmin", "Jmax", "S1", "S2", "H1", "H2", "H3", "H4")
+SHARED_PREFIX = "OMAWG_SHARED="
+SHARED_DEFAULTS = {
+    "endpoint": "0.0.0.0",
+    "network": "10.7.0.0/24",
+    "table": 179,
+    "priority": 10790,
+    "client": "omclient0",
+    "tunnel": "omawg0",
+    "probe_host": "",
+    "probe_port": 5355,
+    "probe_interval": 5,
+    "probe_timeout": 1.0,
+    "obfuscation": {
+        "Jc": 3, "Jmin": 40, "Jmax": 70, "S1": 32, "S2": 48,
+        "H1": 0, "H2": 0, "H3": 0, "H4": 0,
+    },
+}
 
 
 def clean_key(value):
@@ -116,3 +138,63 @@ def obfuscation_lines(value):
             raise ValueError("مقدار نامعتبر برای " + key)
         lines.append("{} = {}".format(key, number))
     return "\n".join(lines)
+
+
+def new_shared_config(junk_count=3):
+    """Build the settings both servers and all clients must share.
+
+    This is deliberately a separate, offline step: `fresh exit` used to need
+    obfuscation values that `fresh iran` had not generated yet.
+    """
+    cfg = copy.deepcopy(SHARED_DEFAULTS)
+    try:
+        junk = int(junk_count)
+    except (TypeError, ValueError):
+        raise ValueError("JUNK_COUNT باید عدد باشد")
+    if junk < 0:
+        raise ValueError("JUNK_COUNT نمیتواند منفی باشد")
+    cfg["obfuscation"]["Jc"] = junk
+    for key in ("H1", "H2", "H3", "H4"):
+        cfg["obfuscation"][key] = secrets.randbelow(0xFFFFFFFF) + 1
+    return cfg
+
+
+def shared_line(cfg):
+    """Encode a shared config into one copy-pasteable line."""
+    raw = json.dumps(cfg, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return SHARED_PREFIX + base64.b64encode(raw).decode("ascii")
+
+
+def parse_shared_line(line):
+    """Decode and validate a line produced by :func:`shared_line`."""
+    text = str(line or "").strip()
+    if text.startswith(SHARED_PREFIX):
+        text = text[len(SHARED_PREFIX):]
+    try:
+        cfg = json.loads(base64.b64decode(text, validate=True).decode("utf-8"))
+    except Exception:
+        raise ValueError("خط تنظیمات مشترک نامعتبر است")
+    if not isinstance(cfg, dict):
+        raise ValueError("تنظیمات مشترک باید یک شیء JSON باشد")
+    obfuscation_lines(cfg.get("obfuscation"))
+    if "network" in cfg:
+        try:
+            ipaddress.IPv4Network(str(cfg["network"]), strict=False)
+        except ValueError:
+            raise ValueError("سابنت تنظیمات مشترک نامعتبر است")
+    return cfg
+
+
+def write_shared_config(cfg, path):
+    """Atomically store the shared config as `network.json`."""
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    tmp = target.with_suffix(target.suffix + ".tmp")
+    tmp.write_text(json.dumps(cfg, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    tmp.replace(target)
+
+
+def read_shared_config(path):
+    with open(path, encoding="utf-8") as handle:
+        return json.load(handle)
+

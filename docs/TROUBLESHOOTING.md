@@ -14,6 +14,18 @@ sudo ls -l /etc/1mobile-panel/{tls.crt,tls.key,password,totp-secret}
 - آدرس `/etc/1mobile-panel/network.json` معتبر نیست → `python3 -m json.tool` روی آن اجرا کنید.
 - پورت 9443 توسط سرویس دیگری گرفته شده → `PORT` را در override systemd تغییر دهید.
 
+## `Shared config is missing` هنگام `fresh`
+
+یعنی `network.json` قبل از نصب ساخته نشده است. روی هر سرور:
+
+```bash
+sudo bash scripts/install.sh fresh-config init     # فقط روی یک سرور
+sudo bash scripts/install.sh fresh-config import 'OMAWG_SHARED=...'  # روی سرور دوم
+sudo bash scripts/install.sh fresh-config show     # خطها روی هر دو برابر باشند
+```
+
+`fresh` هرگز مقادیر مبهمسازی را خودش generate نمیکند تا Exit و Iran ناسازگار نشوند.
+
 ## `awg: command not found` یا `Line unrecognized: Jc`
 
 برخی نسخههای `amneziawg-tools` باینری را `wg` مینامند، یا باینری نصبشده WireGuard ساده است و کلیدهای مبهمسازی را نمیشناسد. نصبکننده باید این را خودتشخیص دهد؛ بررسی و ترمیم:
@@ -22,7 +34,7 @@ sudo ls -l /etc/1mobile-panel/{tls.crt,tls.key,password,totp-secret}
 sudo bash scripts/install.sh awg-check
 ```
 
-دستور بالا تمام نامهای ممکن (`awg`، `wg`) را امتحان میکند، با اعمال `Jc/H1..H4` روی یک اینترفیس موقت عملکرد واقعی را میسنجد و در صورت سالمبودن `/usr/local/bin/awg` را میسازد. اگر شکست خورد:
+دستور بالا تمام نامهای ممکن (`awg`، `wg`) را امتحان میکند، با اعمال `Jc/H1..H4` روی **یک** اینترفیس موقت با نام تصادفی (`awgchk…`) عملکرد واقعی را میسنجد و در صورت سالمبودن `/usr/local/bin/awg` را میسازد. هیچ لینک موجودی دستکاری نمیشود، فقط لینکی که خود آزمایش ساخته حذف میگردد و نتیجهٔ موفق ۲۴ ساعت در `/etc/1mobile-runtime/awg.verified` cache میشود تا در سرور کمحافظه دوباره آزمایش نشود. با `ip -br link | grep awgchk` میتوانید مطمئن شوید چیزی باقی نمانده است. اگر شکست خورد:
 
 ```bash
 sudo INSTALL_AWG=1 bash scripts/install.sh deps

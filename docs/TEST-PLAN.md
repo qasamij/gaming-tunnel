@@ -9,14 +9,16 @@
 - دو VPS تازه با Debian/Ubuntu، شمارهٔ ۱: Iran، شمارهٔ ۲: Exit.
 - از هر دو اسنapshot بگیرید.
 - روی هر دو: `sudo INSTALL_AWG=1 bash scripts/install.sh deps` سپس `sudo bash scripts/install.sh awg-check` (تأیید عملکرد واقعی موتور حتی اگر باینری `wg` نام دارد).
+- **ایمنی آزمایش AWG:** قبل از آزمایش، `ip -br link | grep awgchk` خالی باشد؛ بعد از دو بار اجرای `awg-check` هم خالی بماند (بار دوم از cache استفاده میکند و نباید لینک موقت بسازد). مطمئن شوید هیچ لینک دیگری `down`/حذف نشده است.
 - یک کلاینت AmneziaWG تستی (موبایل یا لپتاپ) برای تست شمارهٔ ۴.
 
 ## تست ۱ — نصب از صفر روی دو VPS
 
-1. روی Iran: `sudo bash scripts/install.sh keygen iran` و `keys show`.
-2. روی Exit: `sudo bash scripts/install.sh keygen exit` و `keys show`.
-3. کلید `omawg0.pub` را جابهجا کنید؛ سپس `fresh exit` و بعد `fresh iran` (با `JUNK_COUNT=0` برای کمترین latency).
-4. **تست محافظ:** دوباره `fresh exit` را اجرا کنید. انتظار میرود با پیام «existing tunnel detected» متوقف شود، نه اینکه Peerها بازنویسی شوند. (فقط در آزمایشگاه با `FORCE_FRESH=1` میشود دور زد.)
+1. تنظیمات مشترک را **قبل از هر نصب** بسازید: روی Iran `sudo JUNK_COUNT=0 bash scripts/install.sh fresh-config init` و خط چاپشدهٔ `OMAWG_SHARED=...` را عیناً روی Exit با `sudo bash scripts/install.sh fresh-config import 'OMAWG_SHARED=...'` وارد کنید. با `fresh-config show` روی هر دو، خطها برابر باشد.
+2. روی Iran: `sudo bash scripts/install.sh keygen iran` و `keys show`.
+3. روی Exit: `sudo bash scripts/install.sh keygen exit` و `keys show`.
+4. کلید `omawg0.pub` را جابهجا کنید؛ سپس `fresh exit` و بعد `fresh iran` (ترتیب این دو دلخواه است).
+5. **تست محافظ:** دوباره `fresh exit` را اجرا کنید. انتظار میرود با پیام «existing tunnel detected» متوقف شود، نه اینکه Peerها بازنویسی شوند. (فقط در آزمایشگاه با `FORCE_FRESH=1` میشود دور زد.)
 
 **معیار قبولی:** هر دو اینترفیس `up` و دارای آدرساند؛ `awg show omawg0 latest-handshakes` تازهای دارد؛ پنل باز میشود؛ از Iran `python3 /opt/1mobile-web-v13/healthcheck.py` وضعیت `ok` میدهد.
 

@@ -1,5 +1,6 @@
 import os
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -18,8 +19,9 @@ class FakeRun:
 
     def __call__(self, args, input_text=None, timeout=10):
         self.calls.append((list(args), input_text, timeout))
+        tail = list(args[1:])
         for command, value in self.responses.items():
-            if command[0] in args[1:]:
+            if all(part in tail for part in command):
                 return value
         return 0, ""
 
@@ -119,9 +121,72 @@ class AwgDetectTests(unittest.TestCase):
         with patch.dict(os.environ, {}, clear=True):
             result = awgdetect.detect(
                 which=lambda name: "/usr/local/bin/awg" if name == "awg" else None,
-                run=run, create=lambda i: True, cleanup=lambda i: None)
+                run=run, create=lambda i: True, cleanup=lambda i: None,
+                iface="awgchktest")
         self.assertTrue(result["verified"])
         self.assertTrue(result["binary"].endswith("/wg"))
+
+    def test_interface_existence_check(self):
+        run = FakeRun({("show",): (0, "3: omawg0: <POINTOPOINT>")})
+        self.assertTrue(awgdetect.interface_exists("omawg0", run))
+        self.assertFalse(awgdetect.interface_exists("awgchk0", FakeRun({})))
+
+    def test_unique_iface_rejects_names_already_in_use(self):
+        taken = {"awgchk" + "a" * 6}
+        name = awgdetect.unique_iface(exists=lambda value: value in taken)
+        self.assertTrue(name.startswith("awgchk"))
+        self.assertLessEqual(len(name), 15)
+        self.assertNotIn(name, taken)
+
+    def test_create_test_iface_needs_the_link_to_appear(self):
+        run = FakeRun({("add",): (0, ""), ("show",): (0, "")})
+        with patch.object(awgdetect, "find_go", return_value=""):
+            self.assertFalse(awgdetect.create_test_iface("awgchk0", run))
+        run = FakeRun({("add",): (0, ""), ("show",): (0, "9: awgchk0: <POINTOPOINT>")})
+        with patch.object(awgdetect, "find_go", return_value=""):
+            self.assertTrue(awgdetect.create_test_iface("awgchk0", run))
+
+    def test_detect_uses_one_shared_interface_and_removes_it_once(self):
+        responses = {("genkey",): (0, KEY), ("pubkey",): (0, KEY)}
+        broken = FakeRun(dict(responses))
+        broken.responses[("setconf",)] = (1, "Line unrecognized: `Jc = 3'")
+        good = FakeRun(dict(responses))
+        good.responses[("setconf",)] = (0, "")
+        good.responses[("show", "private-key")] = (0, KEY)
+
+        def run(args, input_text=None, timeout=10):
+            candidate = broken if args[0].endswith("awg") else good
+            return candidate(args, input_text, timeout)
+
+        created, removed = [], []
+
+        with patch.dict(os.environ, {}, clear=True), \
+             patch.object(awgdetect, "unique_iface", return_value="awgchk123"):
+            result = awgdetect.detect(
+                which=lambda name: "/usr/local/bin/awg" if name == "awg" else None,
+                run=run,
+                create=lambda name: created.append(name) or True,
+                cleanup=lambda name: removed.append(name))
+        self.assertTrue(result["verified"])
+        self.assertEqual(created, ["awgchk123"])
+        self.assertEqual(removed, ["awgchk123"])
+
+    def test_detect_does_not_delete_an_interface_it_did_not_create(self):
+        removed = []
+        result = awgdetect.detect(
+            which=lambda name: None,
+            run=FakeRun({}), create=lambda name: False,
+            cleanup=lambda name: removed.append(name), iface="omawg0")
+        self.assertFalse(result["verified"])
+        self.assertEqual(removed, [])
+
+    def test_marker_cache_expires_and_can_be_forced(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            marker = Path(tmp) / "awg.verified"
+            awgdetect.write_marker("/usr/bin/wg", str(marker))
+            self.assertEqual(awgdetect.read_marker(str(marker)), "/usr/bin/wg")
+            marker.write_text("{} /usr/bin/wg\n".format(int(time.time()) - 90000))
+            self.assertEqual(awgdetect.read_marker(str(marker)), "")
 
     @unittest.skipIf(os.name == "nt", "symlinks need extra privileges on Windows")
     def test_ensure_link_is_atomic_and_idempotent(self):

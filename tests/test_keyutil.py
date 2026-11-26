@@ -1,4 +1,6 @@
+import tempfile
 import unittest
+from pathlib import Path
 
 import keyutil
 
@@ -86,6 +88,41 @@ class KeyUtilTests(unittest.TestCase):
     def test_obfuscation_lines_rejects_missing_keys(self):
         with self.assertRaises(ValueError):
             keyutil.obfuscation_lines('Jc=3 H1=1')
+
+    def test_shared_config_roundtrip(self):
+        cfg = keyutil.new_shared_config(0)
+        line = keyutil.shared_line(cfg)
+        self.assertTrue(line.startswith(keyutil.SHARED_PREFIX))
+        restored = keyutil.parse_shared_line(line)
+        self.assertEqual(restored, cfg)
+        self.assertEqual(restored['obfuscation']['Jc'], 0)
+        self.assertNotEqual(restored['obfuscation']['H1'], restored['obfuscation']['H2'])
+
+    def test_shared_config_import_accepts_bare_base64_and_rejects_garbage(self):
+        cfg = keyutil.new_shared_config(3)
+        line = keyutil.shared_line(cfg)
+        self.assertEqual(keyutil.parse_shared_line(line[len(keyutil.SHARED_PREFIX):]), cfg)
+        for bad in ('', 'not base64', keyutil.SHARED_PREFIX + 'e30='):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                keyutil.parse_shared_line(bad)
+
+    def test_shared_config_is_written_and_read_atomically(self):
+        cfg = keyutil.new_shared_config(2)
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / 'etc' / 'network.json'
+            keyutil.write_shared_config(cfg, target)
+            self.assertEqual(keyutil.read_shared_config(target), cfg)
+            self.assertFalse((target.parent / 'network.json.tmp').exists())
+            self.assertEqual(keyutil.parse_shared_line(
+                keyutil.shared_line(keyutil.read_shared_config(target))), cfg)
+
+    def test_shared_config_rejects_bad_subnet_and_junk(self):
+        cfg = keyutil.new_shared_config()
+        cfg['network'] = 'not-a-subnet'
+        with self.assertRaises(ValueError):
+            keyutil.parse_shared_line(keyutil.shared_line(cfg))
+        with self.assertRaises(ValueError):
+            keyutil.new_shared_config(-1)
 
 
 if __name__ == '__main__':

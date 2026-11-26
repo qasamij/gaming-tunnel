@@ -23,13 +23,44 @@ sudo INSTALL_AWG=1 bash scripts/install.sh deps
 
 `INSTALL_AWG=1` کد رسمی [`amneziawg-tools`](https://github.com/amnezia-vpn/amneziawg-tools) و [`amneziawg-go`](https://github.com/amnezia-vpn/amneziawg-go) را clone و build میکند. اگر از قبل نصباند، مرحله deps را سادهتر اجرا کنید.
 
-نصبکننده وجود فایل اجرایی را کافی نمیداند: با ساخت یک اینترفیس موقت و اعمال مقادیر مبهمسازی، عملکرد واقعی موتور را میآزماید. برخی نسخهها باینری را `wg` مینامند؛ در این صورت بهطور خودکار `/usr/local/bin/awg` به آن متصل میشود. بررسی دستی:
+نصبکننده وجود فایل اجرایی را کافی نمیداند: با ساخت **یک** اینترفیس موقت و اعمال مقادیر مبهمسازی، عملکرد واقعی موتور را میآزماید. برخی نسخهها باینری را `wg` مینامند؛ در این صورت بهطور خودکار `/usr/local/bin/awg` به آن متصل میشود. آزمایش هیچ اینترفیس موجودی را دستکاری نمیکند: نام تصادفی `awgchk…` انتخاب میشود، فقط همان لینک که خودمان ساختهایم حذف میشود، نتیجهٔ موفق ۲۴ ساعت cache میشود تا در سرور کمحافظه بارها آزمایش تکرار نشود. بررسی دستی:
 
 ```bash
 sudo bash scripts/install.sh awg-check
+sudo ip -br link | grep awgchk || echo 'هیچ لینک موقتی باقی نمانده است'
 ```
 
-## 1) تبادل کلیدها
+## 1) تنظیمات مشترک را بسازید (قبل از نصب هر سرور)
+
+مقادیر مبهمسازی و سابنت باید **پیش از** اجرای `fresh` روی هر دو سرور موجود باشند. روی **یکی از سرورها** اجرا کنید:
+
+```bash
+sudo bash scripts/install.sh fresh-config init
+```
+
+این دستور `network.json` را میسازد و یک خط `OMAWG_SHARED=...` چاپ میکند. همان خط را عیناً به سرور دیگر ببرید و وارد کنید:
+
+```bash
+sudo bash scripts/install.sh fresh-config import 'OMAWG_SHARED=...'
+```
+
+بررسی:
+
+```bash
+sudo bash scripts/install.sh fresh-config show        # همان خط را چاپ میکند
+sudo bash scripts/install.sh fresh-config obfuscation # نه خط `Jc = ...` تا `H4 = ...`
+```
+
+به این ترتیب ترتیب نصب Exit و Iran دلخواه است و Exit دیگر منتظر مقادیر تولیدشده در Iran نمیماند. `JUNK_COUNT` فقط هنگام `init` اثر دارد:
+
+```bash
+sudo JUNK_COUNT=0 bash scripts/install.sh fresh-config init
+sudo bash scripts/install.sh fresh-config init   # پیشفرض 3
+```
+
+> هشدار: `network.json` را بعد از ساخت کاربران دوباره generate نکنید؛ تمام کلاینتها باید همان `H1..H4` را داشته باشند.
+
+## 2) تبادل کلیدها
 
 روی **هر دو** سرور:
 
@@ -62,7 +93,7 @@ sudo bash scripts/install.sh persist                # بررسی پایداری 
 
 جزئیات کامل: [docs/KEYS.md](KEYS.md). رمز ادمین نیز به صورت هش Argon2id/scrypt ذخیره میشود، نه متن ساده.
 
-## 2) Exit را پیکربندی کنید
+## 3) Exit را پیکربندی کنید
 
 ```bash
 sudo bash scripts/install.sh fresh exit
@@ -73,10 +104,9 @@ sudo bash scripts/install.sh fresh exit
 1. IP عمومی Iran
 2. `omawg0.pub` مربوط به Iran
 3. پورت تانل Iran (`51821` پیشفرض)
-4. سابنت کلاینتها (`10.7.0.0/24` پیشفرض)
-5. خط مبهمسازی Iran (`Jc=... H1=...`) — فقط اگر `network.json` را کپی نکردهاید؛ یک بار پرسیده و ذخیره میشود.
+4. سابنت کلاینتها (پیشفرض همان سابنتی است که در مرحلهٔ ۱ در `network.json` مشترک شد).
 
-اسکریپت:
+مقادیر مبهمسازی از همان `network.json` خوانده میشوند؛ نیازی به چسباندن دستی خط `Jc/H1..H4` نیست. اسکریپت:
 
 - `omawg0` با آدرس `10.9.0.1/30` میسازد و لینک را `up` میکند.
 - در `AllowedIPs` peer Iran علاوه بر سابنت کلاینتها، `10.9.0.2/32` را هم میگذارد تا پاسخ UDP probe برگردد.
@@ -87,7 +117,7 @@ sudo bash scripts/install.sh fresh exit
 
 فایروال: فقط `UDP/51821` از IP Iran و `UDP/5355` از `10.9.0.2` باز کنید.
 
-## 3) Iran را پیکربندی کنید
+## 4) Iran را پیکربندی کنید
 
 ```bash
 sudo bash scripts/install.sh fresh iran
@@ -107,13 +137,9 @@ sudo bash scripts/install.sh fresh iran
 - جدول routing شماره `179` با rule `from 10.7.0.0/24 lookup 179`،
 - پنل HTTPS و supervisor را نصب میکند.
 
-برای کمترین latency handshake:
+برای کمترین latency handshake، `JUNK_COUNT=0` را هنگام مرحلهٔ ۱ (`fresh-config init`) بدهید؛ مقدار در `network.json` ذخیره میشود و هر دو سرور از آن پیروی میکنند.
 
-```bash
-sudo JUNK_COUNT=0 bash scripts/install.sh fresh iran
-```
-
-## 4) کلید سرور در پنل (خودکار)
+## 5) کلید سرور در پنل (خودکار)
 
 پنل هنگام ساخت کاربر، فایل `/etc/1mobile-client/server.pub` را میخواند. نصب fresh و `keys import iran` آن را از `omclient0.pub` کپی میکنند. اگر سرور قدیمی است یا کلید را عوض کردهاید، دستی:
 
@@ -123,7 +149,7 @@ sudo install -m 644 /etc/1mobile-runtime/keys/omclient0.pub /etc/1mobile-client/
 sudo systemctl restart 1mobile-panel
 ```
 
-## 5) ورود و اولین کاربر
+## 6) ورود و اولین کاربر
 
 1. `https://<IRAN-IP>:9443/` را باز کنید (گواهی self-signed است).
 2. رمز و کد TOTP را وارد کنید (TOTP هنگام نصب چاپ شد).

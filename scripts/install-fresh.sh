@@ -1,7 +1,8 @@
 #!/bin/bash
 # Fresh two-server AmneziaWG gaming tunnel.
-#   Run `fresh-keygen.sh iran` on the Iran VPS and `fresh-keygen.sh exit`
-#   on the exit VPS first, then exchange the printed public keys.
+#   First run `fresh-config.sh init` on one server and `import` the printed
+#   line on the other, then exchange keys with `fresh-keygen.sh iran|exit`.
+#   Only after that run `fresh iran` / `fresh exit` in either order.
 set -euo pipefail
 source "$(dirname "$0")/common.sh"
 need_root
@@ -33,54 +34,21 @@ K="$RUNTIME_DIR/keys"
 install -d -m 700 "$RUNTIME_DIR"
 printf '%s\n' "$ROLE" > "$RUNTIME_DIR/role"
 
-# Obfuscation constants are generated once and shared by both ends + clients.
-if [[ ! -f "$DATA_DIR/network.json" && $ROLE == iran ]]; then
-  install -d -m 700 "$DATA_DIR"
-  python3 - "${JUNK_COUNT:-3}" "$DATA_DIR/network.json" <<'PY'
-import json, secrets, sys
-from pathlib import Path
-jc = int(sys.argv[1]); target = Path(sys.argv[2])
-def u32(): return secrets.randbelow(0xFFFFFFFF) + 1
-cfg = {
-  'endpoint': '0.0.0.0', 'network': '10.7.0.0/24',
-  'table': 179, 'priority': 10790,
-  'client': 'omclient0', 'tunnel': 'omawg0',
-  'probe_host': '', 'probe_port': 5355,
-  'probe_interval': 5, 'probe_timeout': 1.0,
-  'obfuscation': {'Jc': jc, 'Jmin': 40, 'Jmax': 70,
-                  'S1': 32, 'S2': 48,
-                  'H1': u32(), 'H2': u32(), 'H3': u32(), 'H4': u32()},
-}
-tmp = target.with_suffix('.json.tmp'); tmp.write_text(json.dumps(cfg, indent=2)); tmp.replace(target)
-PY
-fi
+# Shared obfuscation/subnet settings are generated ONCE, before either server
+# is installed, by `fresh-config init`. Copy the printed OMAWG_SHARED= line to
+# the other server with `fresh-config import`. Generating them inside
+# `fresh iran` left `fresh exit` without values when Exit was installed first.
+[[ -f "$DATA_DIR/network.json" ]] || fail \
+  'Shared config is missing. Before either server: sudo bash scripts/install.sh fresh-config init ; copy the OMAWG_SHARED=... line to the other server and run: sudo bash scripts/install.sh fresh-config import "<line>"'
 
-# On Exit there is no network.json unless it was copied from Iran, so ask once
-# and remember the answer for future re-installs / key imports.
-if [[ $ROLE == exit && ! -s "$RUNTIME_DIR/obfuscation.txt" && ! -f "$DATA_DIR/network.json" ]]; then
-  read -rp 'Obfuscation line from Iran (Jc=... H1=...), paste exactly: ' OBF_INPUT
-  printf '%s\n' "$OBF_INPUT" > "$RUNTIME_DIR/obfuscation.txt"
-fi
-
-OBF_LINES=""
-if [[ -s "$RUNTIME_DIR/obfuscation.txt" ]]; then
-  OBF_LINES=$(PYTHONPATH="$REPO_DIR/src" OBF_TEXT="$(cat "$RUNTIME_DIR/obfuscation.txt")" \
-    python3 - <<'PY'
-import os
-from keyutil import obfuscation_lines
-print(obfuscation_lines(os.environ['OBF_TEXT']))
+export PYTHONPATH="$REPO_DIR/src${PYTHONPATH:+:$PYTHONPATH}"
+OBF_LINES=$(python3 - "$DATA_DIR/network.json" <<'PY'
+import sys
+from keyutil import obfuscation_lines, read_shared_config
+print(obfuscation_lines(read_shared_config(sys.argv[1])['obfuscation']))
 PY
 )
-elif [[ -f "$DATA_DIR/network.json" ]]; then
-  OBF_LINES=$(PYTHONPATH="$REPO_DIR/src" OBF_JSON="$DATA_DIR/network.json" \
-    python3 - <<'PY'
-import json, os
-from keyutil import obfuscation_lines
-print(obfuscation_lines(json.load(open(os.environ['OBF_JSON']))['obfuscation']))
-PY
-)
-fi
-[[ -n $OBF_LINES ]] || fail 'Obfuscation values are missing; rerun on Iran or paste them on Exit'
+[[ -n $OBF_LINES ]] || fail 'Obfuscation values are missing from the shared config'
 printf '%s\n' "$OBF_LINES" > "$RUNTIME_DIR/obfuscation.txt"
 chmod 600 "$RUNTIME_DIR/obfuscation.txt"
 
@@ -173,7 +141,9 @@ else
   read -rp 'Iran tunnel public key (omawg0.pub from Iran server): ' IRAN_PUB
   read -rp 'Iran tunnel ListenPort [51821]: ' IRAN_PORT
   IRAN_PORT="${IRAN_PORT:-51821}"
-  read -rp 'Client subnet to route/NAT, e.g. 10.7.0.0/24: ' CLIENT_SUBNET
+  DEFAULT_SUBNET=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["network"])' "$DATA_DIR/network.json")
+  read -rp "Client subnet to route/NAT [${DEFAULT_SUBNET}]: " CLIENT_SUBNET
+  CLIENT_SUBNET="${CLIENT_SUBNET:-$DEFAULT_SUBNET}"
   TUNNEL_LOCAL="${TUNNEL_LOCAL:-10.9.0.1/30}"
   TUNNEL_REMOTE="${TUNNEL_REMOTE:-10.9.0.2}"
 

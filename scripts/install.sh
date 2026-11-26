@@ -9,6 +9,8 @@ Usage: bash install.sh <command>
 
   deps       Install Debian/Ubuntu packages (INSTALL_AWG=1 builds upstream AWG)
   awg-check  Verify the real AWG engine and expose it as /usr/local/bin/awg
+  fresh-config  Generate/import shared network settings BEFORE either fresh install
+                (usage: install.sh fresh-config init|show|import|obfuscation)
   keygen     Generate AWG keys on this server (usage: install.sh keygen iran|exit)
   keys       Show or paste/import keys on any server (usage: install.sh keys show|import iran|exit)
   fresh      Full from-scratch tunnel (usage: install.sh fresh iran|exit)
@@ -22,6 +24,8 @@ Usage: bash install.sh <command>
   uninstall  Stop/disable services (CONFIRM=1 also deletes files)
 
 Examples:
+  bash install.sh fresh-config init  # on one server; copy printed OMAWG_SHARED= line
+  bash install.sh fresh-config import 'OMAWG_SHARED=...'  # on the other server
   bash install.sh keygen iran        # on Iran VPS
   bash install.sh keygen exit        # on exit VPS
   bash install.sh keys show          # print public keys to paste elsewhere
@@ -39,6 +43,12 @@ for command in "$@"; do
   case "$command" in
     deps)            bash "$REPO_DIR/scripts/install-deps.sh" ;;
     awg-check)       need_root; PYTHONPATH="$REPO_DIR/src${PYTHONPATH:+:$PYTHONPATH}" python3 "$REPO_DIR/src/awgdetect.py" --link ;;
+    fresh-config)
+      [[ $# -ge 2 ]] || { echo 'fresh-config needs init, show, import or obfuscation' >&2; usage; exit 1; }
+      SUB="$2"; shift 2
+      bash "$REPO_DIR/scripts/fresh-config.sh" "$SUB" "$@"
+      break
+      ;;
     keygen|fresh)
       [[ $# -ge 2 ]] || { echo "$command needs iran or exit" >&2; exit 1; }
       ROLE="$2"; shift
