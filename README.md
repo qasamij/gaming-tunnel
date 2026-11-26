@@ -115,7 +115,7 @@ scripts/      نصابها، supervisor، rollback و uninstall
 systemd/      پنل، supervisor و UDP echo
 config/       نمونه network.json و env
 tests/        ۵۳ تست واحد (mocked، بدون نیاز به سرور)
-docs/         INSTALL / KEYS / TEST-PLAN / PRIVILEGE-SEPARATION / ARCHITECTURE / SECURITY / API / TROUBLESHOOTING
+docs/         INSTALL / KEYS / TEST-PLAN / QUICK-INSTALL (طرح، پیادهسازی نشده) / PRIVILEGE-SEPARATION / ARCHITECTURE / SECURITY / API / TROUBLESHOOTING
 ```
 
 ## تست
@@ -128,7 +128,7 @@ make test
 
 ## وضعیت تست عملی
 
-تاکنون فقط بررسی سورس و تست واحد انجام شده است. قبل از اضافه کردن هر قابلیت تازه، چهار تست عملی روی دو VPS آزمایشی لازم است: نصب صفر، بستن SSH، ریبوت دو سرور و ساخت کاربر همراه با تأیید اینترنت خروجی. جزئیات و جدول نتایج: [`docs/TEST-PLAN.md`](docs/TEST-PLAN.md). تفکیک عملیات مدیریتی از پنل root نیز طراحی شده ولی تا بعد از این تستها اجرا نمیشود: [`docs/PRIVILEGE-SEPARATION.md`](docs/PRIVILEGE-SEPARATION.md).
+تاکنون فقط بررسی سورس و تست واحد انجام شده است. قبل از اضافه کردن هر قابلیت تازه، چهار تست عملی روی دو VPS آزمایشی لازم است: نصب صفر، بستن SSH، ریبوت دو سرور و ساخت کاربر همراه با تأیید اینترنت خروجی. جزئیات و جدول نتایج: [`docs/TEST-PLAN.md`](docs/TEST-PLAN.md). تفکیک عملیات مدیریتی از پنل root و نصب آسان تکدستوری [`docs/QUICK-INSTALL.md`](docs/QUICK-INSTALL.md) هم طراحی شدهاند ولی تا بعد از این تستها اجرا نمیشوند: [`docs/PRIVILEGE-SEPARATION.md`](docs/PRIVILEGE-SEPARATION.md).
 
 ## هشدار امنیتی
 
