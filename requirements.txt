@@ -1,0 +1,11 @@
+# Python dependencies: none (standard library only).
+# Python >= 3.8 is required.
+
+# External binaries expected on the Linux server:
+#   awg            (amneziawg-tools)
+#   amneziawg-go   (amneziawg-go)
+#   ip             (iproute2)
+#   iptables
+#   qrencode
+#   openssl
+#   curl

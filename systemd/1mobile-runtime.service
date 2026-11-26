@@ -1,0 +1,16 @@
+[Unit]
+Description=1Mobile persistent AmneziaWG tunnel supervisor
+Wants=network-online.target
+After=network-online.target
+Before=1mobile-panel.service
+
+[Service]
+Type=simple
+ExecStart=/opt/1mobile-runtime/supervise.sh
+Restart=always
+RestartSec=5
+KillMode=process
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

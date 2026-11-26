@@ -1,0 +1,23 @@
+{
+  "endpoint": "203.0.113.10",
+  "network": "10.7.0.0/24",
+  "table": 179,
+  "priority": 10790,
+  "client": "omclient0",
+  "tunnel": "omawg0",
+  "probe_host": "10.7.0.1",
+  "probe_port": 5355,
+  "probe_interval": 5,
+  "probe_timeout": 1.0,
+  "obfuscation": {
+    "Jc": 3,
+    "Jmin": 40,
+    "Jmax": 70,
+    "S1": 32,
+    "S2": 48,
+    "H1": 123456789,
+    "H2": 234567891,
+    "H3": 345678912,
+    "H4": 456789123
+  }
+}

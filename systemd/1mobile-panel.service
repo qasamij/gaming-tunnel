@@ -1,0 +1,16 @@
+[Unit]
+Description=1Mobile Gaming control panel (HTTPS :9443)
+Wants=network-online.target
+After=network-online.target 1mobile-runtime.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/1mobile-web-v13/web.py
+Restart=always
+RestartSec=3
+KillMode=process
+UMask=0077
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
