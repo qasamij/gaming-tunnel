@@ -14,7 +14,9 @@
 - **مصرف هر کاربر**، اعتبار روزانه و سهمیه GiB با حذف خودکار peer منقضی.
 - **مدیریت کاربران**، دانلود کانفیگ و QR، تغییر IP کانفیگها، بکاپ محلی، عیب‌یابی و ترمیم routing اختصاصی.
 - **امنیت**: رمز هششده (Argon2id یا scrypt) + TOTP، محدودیت تلاش، session چرخان، CSRF، CSP، TLS 1.2+، فایلهای `600`، نوشتن atomic.
-- **systemd + supervisor**: اگر اینترفیس حذف شود، از کانفیگ و آدرس ذخیرهشده بازسازی میشود، لینک `up` و مسیرها دوباره اعمال میشوند؛ اینترفیس سالم دست نخورده میماند. تانل به نشست SSH وابسته نیست.
+- **systemd + supervisor هوشمند سلامت**: اگر اینترفیس حذف شود، از کانفیگ و آدرس ذخیرهشده بازسازی میشود؛ اگر زنده باشد ولی handshake کهنه یا UDP probe ناموفق باشد، بعد از ۳ تلاش متوالی تعمیر نرم میکند (Peerهای فعلی حفظ میشوند). تانل به نشست SSH وابسته نیست.
+- **جداسازی نصب مخرب از ارتقا**: `fresh` در حضور تانل موجود متوقف میشود و فقط با `FORCE_FRESH=1` روی سرور آزمایشی قابل اجراست.
+- **شناسایی واقعی AmneziaWG**: وجود executable کافی نیست؛ نصبکننده یک اینترفیس موقت میسازد و کلیدهای مبهمسازی را اعمال میکند. اگر باینری با نام `wg` نصب شده باشد، بهصورت خودکار `/usr/local/bin/awg` به آن متصل میشود (`install.sh awg-check`).
 - **وارد کردن ساده کلیدها**: `bash install.sh keys show|import iran|exit` روی هر سرور، بدون نیاز به یادداشت دستی مسیرها.
 - **Rollback** کامل سرویسها و مسیر برگشت نصب قدیمی.
 
@@ -97,12 +99,12 @@ sudo bash scripts/install.sh rollback-runtime
 ## ساختار repository
 
 ```text
-src/          backend.py, ops.py, monitor.py, web.py, udp_echo.py, static/
+src/          backend.py, ops.py, monitor.py, web.py, healthcheck.py, passwords.py, keyutil.py, udp_echo.py, static/
 scripts/      نصابها، supervisor، rollback و uninstall
 systemd/      پنل، supervisor و UDP echo
 config/       نمونه network.json و env
-tests/        26 تست واحد (مocked، بدون نیاز به سرور)
-docs/         INSTALL / KEYS / ARCHITECTURE / SECURITY / API / TROUBLESHOOTING
+tests/        ۴۳ تست واحد (mocked، بدون نیاز به سرور)
+docs/         INSTALL / KEYS / TEST-PLAN / PRIVILEGE-SEPARATION / ARCHITECTURE / SECURITY / API / TROUBLESHOOTING
 ```
 
 ## تست
@@ -113,15 +115,19 @@ make test
 
 همه تستها بدون network واقعی و با `awg` شبیهسازی شده (mocked) اجرا میشوند.
 
+## وضعیت تست عملی
+
+تاکنون فقط بررسی سورس و تست واحد انجام شده است. قبل از اضافه کردن هر قابلیت تازه، چهار تست عملی روی دو VPS آزمایشی لازم است: نصب صفر، بستن SSH، ریبوت دو سرور و ساخت کاربر همراه با تأیید اینترنت خروجی. جزئیات و جدول نتایج: [`docs/TEST-PLAN.md`](docs/TEST-PLAN.md). تفکیک عملیات مدیریتی از پنل root نیز طراحی شده ولی تا بعد از این تستها اجرا نمیشود: [`docs/PRIVILEGE-SEPARATION.md`](docs/PRIVILEGE-SEPARATION.md).
+
 ## هشدار امنیتی
 
 پنل با مجوز root اجرا میشود چون باید `awg`، `ip`، `sysctl` و `iptables` را فراخوانی کند. برای IP متغیر، پورت 9443 را با `DROP` فایروال قفل نکنید؛ از TLS + رمز هششده + TOTP استفاده کنید یا پنل را پشت SSH tunnel ببندید. گواهی self-signed را در صورت تغییر IP تمدید کنید. جزئیات: [`docs/SECURITY.md`](docs/SECURITY.md)
 
 ## خلاصه انگلیسی / English summary
 
-A lightweight, HTTPS control panel for a fresh two-server **AmneziaWG** gaming tunnel (Iran + Exit). The dashboard shows live total and per-user download/upload speeds, traffic graphs, traffic usage, quota/expiry, handshakes, and UDP RTT/jitter/windowed packet loss. Page loads and `/metrics` never call `awg` or `ping` synchronously — background workers update an in-memory cache every 2s/5s, keeping ping overhead minimal. Passwords are stored as salted Argon2id/scrypt hashes. Includes systemd units, a reboot-safe supervisor, simple key import on either server, rollback/uninstall scripts, 26 unit tests and CI.
+A lightweight, HTTPS control panel for a fresh two-server **AmneziaWG** gaming tunnel (Iran + Exit). The dashboard shows live total and per-user download/upload speeds, traffic graphs, traffic usage, quota/expiry, handshakes, and UDP RTT/jitter/windowed packet loss. Page loads and `/metrics` never call `awg` or `ping` synchronously — background workers update an in-memory cache every 2s/5s, keeping ping overhead minimal. Passwords are stored as salted Argon2id/scrypt hashes. Includes systemd units, a health-aware reboot-safe supervisor (fresh handshake + end-to-end UDP probe), a guard that refuses `fresh` on a live tunnel, simple key import on either server, rollback/uninstall scripts, 43 unit tests and CI. The installer verifies the AWG engine functionally (as some builds name it `wg`) and publishes a stable `awg` command.
 
-Quick start: `INSTALL_AWG=1 bash scripts/install.sh deps` → `bash scripts/install.sh keygen iran|exit` (exchange `omawg0.pub`) → `bash scripts/install.sh fresh exit` → `bash scripts/install.sh fresh iran` → `bash scripts/install.sh persist`. See [docs/INSTALL.md](docs/INSTALL.md) and [docs/KEYS.md](docs/KEYS.md).
+Quick start: `INSTALL_AWG=1 bash scripts/install.sh deps` → `bash scripts/install.sh keygen iran|exit` (exchange `omawg0.pub`) → `bash scripts/install.sh fresh exit` → `bash scripts/install.sh fresh iran` → `bash scripts/install.sh persist`. See [docs/INSTALL.md](docs/INSTALL.md), [docs/KEYS.md](docs/KEYS.md) and the mandatory lab checklist in [docs/TEST-PLAN.md](docs/TEST-PLAN.md).
 
 ## لایسنس
 

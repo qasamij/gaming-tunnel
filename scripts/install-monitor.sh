@@ -4,6 +4,7 @@ set -euo pipefail
 source "$(dirname "$0")/common.sh"
 need_root
 umask 077
+need_awg
 
 OLD="${OLD_PREFIX:-/opt/1mobile-web-v11}"
 [[ -f "$OLD/web.py" && -s "$DATA_DIR/password" ]] || fail 'Existing v1 panel data not found'
@@ -12,7 +13,9 @@ grep -qE '/opt/1mobile-web-v(1|11)/web\.py' "$PANEL_UNIT" || \
 
 PYTHONPATH="$REPO_DIR/src" python3 -m py_compile \
   "$REPO_DIR/src/web.py" "$REPO_DIR/src/backend.py" \
-  "$REPO_DIR/src/ops.py" "$REPO_DIR/src/monitor.py" "$REPO_DIR/src/udp_echo.py"
+  "$REPO_DIR/src/ops.py" "$REPO_DIR/src/monitor.py" \
+  "$REPO_DIR/src/passwords.py" "$REPO_DIR/src/keyutil.py" \
+  "$REPO_DIR/src/healthcheck.py" "$REPO_DIR/src/udp_echo.py"
 
 STAMP=$(date +%Y%m%d-%H%M%S)
 BACKUP="$DATA_DIR/backup/upgrade-$STAMP"
@@ -40,7 +43,9 @@ info 'Installing v1.4 files'
 install -d -m 755 "$PREFIX"
 install -d -m 755 "$PREFIX/static"
 install -m 600 "$REPO_DIR"/src/web.py "$REPO_DIR"/src/backend.py \
-  "$REPO_DIR"/src/ops.py "$REPO_DIR"/src/monitor.py "$PREFIX/"
+  "$REPO_DIR"/src/ops.py "$REPO_DIR"/src/monitor.py \
+  "$REPO_DIR"/src/passwords.py "$REPO_DIR"/src/keyutil.py \
+  "$REPO_DIR"/src/healthcheck.py "$PREFIX/"
 install -m 644 "$REPO_DIR"/src/udp_echo.py "$PREFIX/udp_echo.py"
 install -m 644 "$REPO_DIR"/src/static/style.css "$REPO_DIR"/src/static/app.js "$PREFIX/static/"
 

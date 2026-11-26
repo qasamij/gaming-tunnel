@@ -23,6 +23,12 @@ sudo INSTALL_AWG=1 bash scripts/install.sh deps
 
 `INSTALL_AWG=1` کد رسمی [`amneziawg-tools`](https://github.com/amnezia-vpn/amneziawg-tools) و [`amneziawg-go`](https://github.com/amnezia-vpn/amneziawg-go) را clone و build میکند. اگر از قبل نصباند، مرحله deps را سادهتر اجرا کنید.
 
+نصبکننده وجود فایل اجرایی را کافی نمیداند: با ساخت یک اینترفیس موقت و اعمال مقادیر مبهمسازی، عملکرد واقعی موتور را میآزماید. برخی نسخهها باینری را `wg` مینامند؛ در این صورت بهطور خودکار `/usr/local/bin/awg` به آن متصل میشود. بررسی دستی:
+
+```bash
+sudo bash scripts/install.sh awg-check
+```
+
 ## 1) تبادل کلیدها
 
 روی **هر دو** سرور:
@@ -159,6 +165,7 @@ sudo bash scripts/install.sh rollback-runtime   # unit supervisor قدیمی
 ## چک لیست بعد از نصب
 
 ```bash
+sudo bash scripts/install.sh awg-check
 sudo awg show omclient0
 sudo awg show omawg0
 sudo ip rule show | grep 179

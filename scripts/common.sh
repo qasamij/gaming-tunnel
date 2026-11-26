@@ -13,6 +13,15 @@ RUNTIME_UNIT="$SYSTEMD_DIR/1mobile-runtime.service"
 ECHO_UNIT="$SYSTEMD_DIR/1mobile-udp-echo.service"
 
 need_root() { [[ $EUID -eq 0 ]] || { echo "Run as root" >&2; exit 1; }; }
+
+# Some amneziawg-tools builds install the CLI as `wg`, not `awg`. Verify the
+# real engine (including obfuscation keys) and provide a stable `awg` path.
+need_awg() {
+  PYTHONPATH="$REPO_DIR/src${PYTHONPATH:+:$PYTHONPATH}" \
+    python3 "$REPO_DIR/src/awgdetect.py" --link --quiet || \
+    fail 'AmneziaWG CLI missing or not functional. Run: sudo bash install.sh awg-check'
+}
+
 ok() { printf '\n[ok] %s\n' "$*"; }
 info() { printf '\n[*] %s\n' "$*"; }
 fail() { printf '\n[!] %s\n' "$*" >&2; exit 1; }

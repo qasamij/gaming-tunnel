@@ -8,12 +8,25 @@ need_root
 umask 077
 
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-for cmd in awg amneziawg-go ip iptables python3 openssl curl qrencode; do
+for cmd in amneziawg-go ip iptables python3 openssl curl qrencode; do
   command -v "$cmd" >/dev/null || fail "Missing command: $cmd"
 done
+need_awg
 
 ROLE="${1:-}"
 [[ $ROLE == iran || $ROLE == exit ]] || { echo "Usage: install-fresh.sh iran|exit" >&2; exit 1; }
+
+# `fresh` is deliberately destructive: it rewrites saved configs and applies
+# them to live interfaces with `awg setconf`. Refuse it on a running tunnel
+# so an accidental re-run cannot drop peers added by the panel.
+if [[ ${FORCE_FRESH:-0} != 1 ]]; then
+  if awg show omawg0 public-key >/dev/null 2>&1 || \
+     awg show omclient0 public-key >/dev/null 2>&1 || \
+     [[ -s "$RUNTIME_DIR/role" && -s "$RUNTIME_DIR/omawg0.conf" ]]; then
+    fail 'An existing tunnel/saved state was detected. Use "install.sh runtime", "install.sh monitor" or "install.sh keys import" instead. Set FORCE_FRESH=1 ONLY for an intentional rebuild on a lab server.'
+  fi
+fi
+
 K="$RUNTIME_DIR/keys"
 [[ -s "$K/omawg0.key" ]] || fail "Run: bash fresh-keygen.sh $ROLE"
 
@@ -104,6 +117,8 @@ start_iface() {
 install -d -m 700 /opt/1mobile-runtime
 install -m 755 "$REPO_DIR/scripts/runtime.sh" /opt/1mobile-runtime/runtime.sh
 install -m 700 "$REPO_DIR/scripts/apply-iface.sh" /opt/1mobile-runtime/apply-iface.sh
+install -m 600 "$REPO_DIR/src/keyutil.py" /opt/1mobile-runtime/keyutil.py
+install -m 600 "$REPO_DIR/src/awgdetect.py" /opt/1mobile-runtime/awgdetect.py
 
 if [[ $ROLE == iran ]]; then
   read -rp 'Public IPv4 clients will connect to (Iran): ' CLIENT_ENDPOINT

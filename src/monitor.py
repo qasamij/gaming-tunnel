@@ -16,7 +16,7 @@ import threading
 import time
 from collections import deque
 
-VERSION = "1.4.1"
+VERSION = "1.4.2"
 IFACES = ("omclient0", "omawg0")
 
 lock = threading.RLock()

@@ -8,7 +8,7 @@ need_root
 umask 077
 
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-command -v awg >/dev/null || fail 'amneziawg-tools (awg) is required'
+need_awg
 
 K="$RUNTIME_DIR/keys"
 install -d -m 700 "$K"

@@ -6,6 +6,7 @@ need_root
 umask 077
 
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+need_awg
 [[ -s "$RUNTIME_DIR/role" && -x /opt/1mobile-runtime/runtime.sh ]] || \
   fail 'Runtime role file and runtime.sh are required'
 [[ -f $RUNTIME_UNIT ]] || install -m 644 "$REPO_DIR/systemd/1mobile-runtime.service" "$RUNTIME_UNIT"
@@ -35,6 +36,12 @@ done
 install -d -m 700 /opt/1mobile-runtime
 install -m 700 "$REPO_DIR/scripts/runtime-supervise.sh" /opt/1mobile-runtime/supervise.sh
 install -m 700 "$REPO_DIR/scripts/apply-iface.sh" /opt/1mobile-runtime/apply-iface.sh
+install -m 600 "$REPO_DIR/src/keyutil.py" /opt/1mobile-runtime/keyutil.py
+install -m 600 "$REPO_DIR/src/awgdetect.py" /opt/1mobile-runtime/awgdetect.py
+# The supervisor reads healthcheck.py from the panel prefix; install it even
+# when the panel itself was installed by an older version of this project.
+install -d -m 755 "$PREFIX"
+install -m 600 "$REPO_DIR/src/healthcheck.py" "$PREFIX/healthcheck.py"
 install -m 644 "$REPO_DIR/systemd/1mobile-runtime.service" "$RUNTIME_UNIT"
 
 systemctl daemon-reload

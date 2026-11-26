@@ -7,6 +7,7 @@ need_root
 umask 077
 
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+need_awg
 [[ -s "$RUNTIME_DIR/role" ]] || fail 'No role file yet: run keygen/keys import/fresh first'
 ROLE=$(cat "$RUNTIME_DIR/role")
 
@@ -14,6 +15,9 @@ install -d -m 700 /opt/1mobile-runtime
 install -m 755 "$REPO_DIR/scripts/runtime.sh" /opt/1mobile-runtime/runtime.sh
 install -m 700 "$REPO_DIR/scripts/runtime-supervise.sh" /opt/1mobile-runtime/supervise.sh
 install -m 700 "$REPO_DIR/scripts/apply-iface.sh" /opt/1mobile-runtime/apply-iface.sh
+install -m 600 "$REPO_DIR/src/keyutil.py" /opt/1mobile-runtime/keyutil.py
+install -m 600 "$REPO_DIR/src/awgdetect.py" /opt/1mobile-runtime/awgdetect.py
+install -m 600 "$REPO_DIR/src/healthcheck.py" "$PREFIX/healthcheck.py"
 
 case "$ROLE" in
   iran) interfaces=(omawg0 omclient0) ;;

@@ -49,6 +49,48 @@ def rewrite_conf(text, private=None, peer_public=None):
     return out
 
 
+def merge_peers(base_text, live_text):
+    """Append live [Peer] blocks missing from ``base_text``.
+
+    ``awg setconf`` replaces the whole peer list. When we re-apply a saved
+    config to a *live* interface we must not silently delete clients that
+    were added by the panel after that config was saved.
+    """
+    def peer_blocks(text):
+        blocks, current = [], []
+        for line in str(text).splitlines():
+            stripped = line.strip()
+            if stripped == "[Peer]":
+                if current:
+                    blocks.append(current)
+                current = [line]
+            elif stripped.startswith("[") and stripped.endswith("]"):
+                if current:
+                    blocks.append(current)
+                    current = []
+            elif current:
+                current.append(line)
+        if current:
+            blocks.append(current)
+        return blocks
+
+    def pubkey_of(block):
+        match = re.search(r"(?m)^PublicKey\s*=\s*(\S+)", "\n".join(block))
+        return match.group(1) if match else None
+
+    base = str(base_text)
+    known = {p for p in (pubkey_of(b) for b in peer_blocks(base)) if p}
+    additions = []
+    for block in peer_blocks(live_text):
+        pub = pubkey_of(block)
+        if pub and pub not in known:
+            additions.append("\n".join(block).strip("\n"))
+            known.add(pub)
+    if not additions:
+        return base
+    return base.rstrip("\n") + "\n\n" + "\n\n".join(additions) + "\n"
+
+
 def obfuscation_lines(value):
     """Normalise obfuscation values into one ``Key = value`` line per key.
 

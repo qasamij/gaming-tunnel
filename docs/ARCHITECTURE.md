@@ -57,12 +57,15 @@ flowchart TD
 | `/etc/1mobile-panel/` | password (هش Argon2id/scrypt), totp-secret, tls.*, users.json, network.json, backup/ | 700 |
 | `/etc/1mobile-runtime/` | role, keys/, `<iface>.conf`, `<iface>.addr`, obfuscation.txt, exit.json | 700 |
 | `/etc/1mobile-client/server.pub` | کلید عمومی omclient0 | 644 |
-| `/opt/1mobile-web-v13/` | کد پنل + static/ | 755 (کدها 600 بجز udp_echo.py) |
-| `/opt/1mobile-runtime/` | runtime.sh, supervise.sh, apply-iface.sh | 700 |
+| `/opt/1mobile-web-v13/` | کد پنل + static/ + healthcheck.py, awgdetect.py | 755 (کدها 600 بجز udp_echo.py) |
+| `/opt/1mobile-runtime/` | runtime.sh, supervise.sh, apply-iface.sh, keyutil.py, awgdetect.py | 700 |
+| `/usr/local/bin/awg` | پیوند به باینری تأییدشدهٔ AmneziaWG (`awg` یا `wg`) | 755 |
 
 ## بازیابی بعد از ریبوت
 
-`1mobile-runtime.service` فرایند `supervise.sh` را نگه میدارد. این فرایند فقط زمانی که اینترفیس گم شده باشد `apply-iface.sh` را اجرا میکند:
+`1mobile-runtime.service` فرایند `supervise.sh` را نگه میدارد. علاوه بر بازسازی اینترفیس گم شده، هر ۶۰ ثانیه `healthcheck.py` را اجرا میکند؛ اگر handshake کهنه یا UDP probe ناموفق باشد، بعد از ۳ تلاش متوالی `apply-iface.sh` + `runtime.sh` را با حفظ Peerها اعمال میکند.
+
+برای بازسازی اینترفیس گم شده:
 
 1. `amneziawg-go <iface>` برای ساخت لینک،
 2. `awg setconf` بر روی کانفیگی که خطوط `Address/DNS/MTU/Table` آن حذف شدهاند (wg-quick معمولاً اینها را جداگانه اعمال میکند)،

@@ -27,7 +27,7 @@ import monitor
 import ops
 import passwords
 
-VERSION = "1.4.1"
+VERSION = "1.4.2"
 BASE = Path(__file__).resolve().parent
 STATIC = BASE / "static"
 

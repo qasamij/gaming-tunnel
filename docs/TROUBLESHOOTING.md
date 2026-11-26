@@ -14,13 +14,21 @@ sudo ls -l /etc/1mobile-panel/{tls.crt,tls.key,password,totp-secret}
 - آدرس `/etc/1mobile-panel/network.json` معتبر نیست → `python3 -m json.tool` روی آن اجرا کنید.
 - پورت 9443 توسط سرویس دیگری گرفته شده → `PORT` را در override systemd تغییر دهید.
 
-## `awg: command not found`
+## `awg: command not found` یا `Line unrecognized: Jc`
 
-پیشنیاز AmneziaWG نصب نشده:
+برخی نسخههای `amneziawg-tools` باینری را `wg` مینامند، یا باینری نصبشده WireGuard ساده است و کلیدهای مبهمسازی را نمیشناسد. نصبکننده باید این را خودتشخیص دهد؛ بررسی و ترمیم:
+
+```bash
+sudo bash scripts/install.sh awg-check
+```
+
+دستور بالا تمام نامهای ممکن (`awg`، `wg`) را امتحان میکند، با اعمال `Jc/H1..H4` روی یک اینترفیس موقت عملکرد واقعی را میسنجد و در صورت سالمبودن `/usr/local/bin/awg` را میسازد. اگر شکست خورد:
 
 ```bash
 sudo INSTALL_AWG=1 bash scripts/install.sh deps
 ```
+
+پیشنیاز `amneziawg-go` هم الزامی است؛ در انتهای `deps` وجود آن بررسی میشود.
 
 ## کاربر ساخته شده ولی connect نمیشود
 

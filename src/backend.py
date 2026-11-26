@@ -22,7 +22,7 @@ from pathlib import Path
 import monitor
 import ops
 
-VERSION = "1.4.1"
+VERSION = "1.4.2"
 os.umask(0o077)
 
 D = Path(os.getenv("PANEL_DATA", "/etc/1mobile-panel"))

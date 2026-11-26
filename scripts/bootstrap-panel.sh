@@ -9,7 +9,7 @@ umask 077
 for cmd in python3 openssl ip curl; do
   command -v "$cmd" >/dev/null || fail "Missing command: $cmd"
 done
-command -v awg >/dev/null || echo "[warn] awg not found; peer management will fail until installed"
+need_awg
 command -v qrencode >/dev/null || echo "[warn] qrencode not found; QR downloads will fail until installed"
 
 [[ -s "$DATA_DIR/password" && ${FORCE:-0} != 1 ]] && \

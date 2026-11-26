@@ -4,7 +4,7 @@ set -euo pipefail
 source "$(dirname "$0")/common.sh"
 need_root
 
-command -v awg >/dev/null || fail 'amneziawg-tools (awg) is required'
+need_awg
 ROLE="${1:-}"
 [[ $ROLE == iran || $ROLE == exit ]] || { echo "Usage: fresh-keygen.sh iran|exit" >&2; exit 1; }
 

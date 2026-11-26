@@ -54,6 +54,19 @@ class KeyUtilTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             keyutil.rewrite_conf('[Interface]\nPrivateKey = ' + KEY_A + '\n', peer_public=KEY_B)
 
+    def test_merge_peers_keeps_unknown_live_peers(self):
+        base = "[Interface]\nPrivateKey = " + KEY_A + "\n\n[Peer]\nPublicKey = " + KEY_B + "\nAllowedIPs = 10.7.0.2/32\n"
+        live = "[Interface]\nPrivateKey = " + KEY_A + "\n\n[Peer]\nPublicKey = " + KEY_B + "\nAllowedIPs = 10.7.0.2/32\n\n[Peer]\nPublicKey = " + KEY_A + "\nAllowedIPs = 10.7.0.3/32\nEndpoint = 198.51.100.9:51820\n"
+        out = keyutil.merge_peers(base, live)
+        self.assertEqual(out.count("[Peer]"), 2)
+        self.assertIn("AllowedIPs = 10.7.0.3/32", out)
+        self.assertIn("Endpoint = 198.51.100.9:51820", out)
+
+    def test_merge_peers_is_idempotent(self):
+        base = "[Interface]\nPrivateKey = " + KEY_A + "\n\n[Peer]\nPublicKey = " + KEY_B + "\n"
+        once = keyutil.merge_peers(base, base)
+        self.assertEqual(keyutil.merge_peers(once, base), once)
+
     def test_obfuscation_lines_from_dict(self):
         data = dict(Jc=3, Jmin=40, Jmax=70, S1=32, S2=48,
                     H1=1, H2=2, H3=3, H4=4)

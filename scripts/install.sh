@@ -8,6 +8,7 @@ usage() {
 Usage: bash install.sh <command>
 
   deps       Install Debian/Ubuntu packages (INSTALL_AWG=1 builds upstream AWG)
+  awg-check  Verify the real AWG engine and expose it as /usr/local/bin/awg
   keygen     Generate AWG keys on this server (usage: install.sh keygen iran|exit)
   keys       Show or paste/import keys on any server (usage: install.sh keys show|import iran|exit)
   fresh      Full from-scratch tunnel (usage: install.sh fresh iran|exit)
@@ -37,6 +38,7 @@ EOF
 for command in "$@"; do
   case "$command" in
     deps)            bash "$REPO_DIR/scripts/install-deps.sh" ;;
+    awg-check)       need_root; PYTHONPATH="$REPO_DIR/src${PYTHONPATH:+:$PYTHONPATH}" python3 "$REPO_DIR/src/awgdetect.py" --link ;;
     keygen|fresh)
       [[ $# -ge 2 ]] || { echo "$command needs iran or exit" >&2; exit 1; }
       ROLE="$2"; shift

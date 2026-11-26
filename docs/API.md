@@ -12,7 +12,7 @@
 
 ```json
 {
-  "version": "1.4.1",
+  "version": "1.4.2",
   "now": 1764163200.12,
   "endpoint": "203.0.113.10",
   "history": [

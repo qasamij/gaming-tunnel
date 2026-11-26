@@ -41,7 +41,7 @@ sudo OMAWG0_KEY='...' PEER_PUB='...' \
 
 - کلیدها در `/etc/1mobile-runtime/keys/` ذخیره و اعتبارسنجی میشوند.
 - فایلهای `.conf` ذخیرهشده آپدیت میشوند (Address، پورت، obfuscation، Endpoint و AllowedIPs **دستنخورده** میمانند).
-- اگر اینترفیس زنده باشد، همان لحظه با `apply-iface.sh` کلیدها، آدرس و وضعیت `up` اعمال میشود؛ اگر نباشد، supervisor در راهاندازی بعدی آن را میسازد.
+- اگر اینترفیس زنده باشد، همان لحظه با `apply-iface.sh` کلیدها، آدرس و وضعیت `up` اعمال میشود؛ Peerهای اضافهشده توسط پنل حفظ میشوند (`merge_peers`). اگر نباشد، supervisor در راهاندازی بعدی آن را میسازد.
 - روی Iran کلید `omclient0.pub` بهطور خودکار در `/etc/1mobile-client/server.pub` کپی میشود تا پنل هنگام ساخت کاربر از آن استفاده کند.
 - در انتها `install.sh persist` اجرا و سرویسها بررسی میشوند.
 
@@ -53,7 +53,7 @@ sudo OMAWG0_KEY='...' PEER_PUB='...' \
 
 | سرویس | نقش |
 |---|---|
-| `1mobile-runtime.service` | هر ۱۵ ثانیه چک میکند اینترفیسها زندهاند؛ اگر نبودند از `.conf` و `.addr` ذخیرهشده میسازد، لینک را `up` میکند و routing/NAT را دوباره اعمال میکند. |
+| `1mobile-runtime.service` | هر ۱۵ ثانیه چک میکند اینترفیسها زندهاند؛ اگر نبودند از `.conf` و `.addr` ذخیرهشده میسازد. هر ۶۰ ثانیه هم سلامت تانل (handshake تازه + UDP probe) را بررسی میکند و بعد از ۳ تلاش ناموفق متوالی تعمیر نرم میکند. |
 | `1mobile-panel.service` | پنل HTTPS (فقط Iran). |
 | `1mobile-udp-echo.service` | پاسخ UDP probe برای RTT (فقط Exit). |
 
