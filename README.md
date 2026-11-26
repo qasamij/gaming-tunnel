@@ -2,7 +2,7 @@
 
 پنل وب سبک و امن برای مانیتورینگ زنده تانل گیمینگ مبتنی بر **AmneziaWG**.
 
-> GitHub: `github.com/qasamij/1mobile-gaming-tunnel`
+> GitHub: `github.com/qasamij/gaming-tunnel`
 
 ## ویژگیها
 
@@ -35,8 +35,8 @@ flowchart LR
 ### 1) نصب پیشنیازها (روی هر دو VPS)
 
 ```bash
-git clone https://github.com/qasamij/1mobile-gaming-tunnel.git
-cd 1mobile-gaming-tunnel
+git clone https://github.com/qasamij/gaming-tunnel.git
+cd gaming-tunnel
 sudo INSTALL_AWG=1 bash scripts/install.sh deps
 ```
 

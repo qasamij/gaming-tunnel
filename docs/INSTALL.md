@@ -16,8 +16,8 @@
 ```bash
 sudo apt-get update
 sudo apt-get install -y git
-git clone https://github.com/qasamij/1mobile-gaming-tunnel.git
-cd 1mobile-gaming-tunnel
+git clone https://github.com/qasamij/gaming-tunnel.git
+cd gaming-tunnel
 sudo INSTALL_AWG=1 bash scripts/install.sh deps
 ```
 

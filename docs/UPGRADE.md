@@ -5,7 +5,7 @@
 پنل قدیمی را دستی حذف نکنید. اسکریپت ارتقا خودش بکاپ میگیرد:
 
 ```bash
-cd 1mobile-gaming-tunnel
+cd gaming-tunnel
 sudo bash scripts/install.sh monitor
 sudo bash scripts/install.sh runtime   # تنها در صورتی که supervisor قدیمی دارید
 ```
