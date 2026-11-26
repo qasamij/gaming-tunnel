@@ -48,7 +48,7 @@ sudo bash quick-install.sh
 | ۴ | سرویسهای دائمی و بازیابی بعد از ریبوت | `install.sh runtime` و `persist` موجود |
 | ۵ | بررسی Routing، NAT، Handshake و اینترنت | `healthcheck.py` موجود + `awg show` + بررسی خروجی واقعی از Exit |
 | ۶ | پنل گرافیکی با رمز و ورود دومرحلهای | `bootstrap-panel.sh` موجود؛ رمز هش Argon2id/scrypt و TOTP تکبار چاپ میشود |
-| ۷ | بکاپ قبل از ارتقا و Rollback | اسنپشات خودکار + فراخوانی `rollback.sh` / `rollback-runtime.sh` موجود |
+| ۷ | بکاپ قبل از ارتقا و Rollback | ثبت **فقط تغییرات اختصاصی نصبکننده** با `run-id` + فراخوانی `rollback.sh` / `rollback-runtime.sh` موجود؛ اسنپشات کامل فقط برای لاگ و بازیابی دستی است، نه برای `iptables-restore` |
 
 هیچ منطقی کپی نمیشود: `quick-install.sh` یک منوی نازک است و تمام کارها را از اسکریپتهای فعلی میخواند.
 
@@ -56,7 +56,9 @@ sudo bash quick-install.sh
 
 - ارتباط فقط از طریق `ssh` با **کلید** و `BatchMode=yes`؛ رمز عبور در مخزن، لاگ یا متغیر محیطی ذخیره نمیشود.
 - قبل از اولین اتصال، اثر انگشت host به کاربر نشان داده میشود و تأیید او لازم است؛ سپس در `/root/.ssh/known_hosts` با مجوز ۶۰۰ ثبت میشود.
-- کاربر میتواند کلید خصوصی موجود خود (`~/.ssh/id_ed25519`) را بدهد، یا نصبکننده یک کلید موقت `ed25519` در `mktemp -d` میسازد و کلید عمومی آن را چاپ میکند تا یک بار در `authorized_keys` سرور خارج اضافه شود. کلید موقت بعد از اتمام حذف میشود.
+- کاربر میتواند کلید خصوصی موجود خود (`~/.ssh/id_ed25519`) را بدهد، یا نصبکننده یک کلید موقت `ed25519` در `mktemp -d` میسازد و کلید عمومی آن را چاپ میکند تا یک بار در `authorized_keys` سرور خارج اضافه شود.
+- **پاک کردن کلید خصوصی روی Iran کافی نیست.** کلید عمومی موقت با یک برچسب منحصر به فرد (`# 1mobile-setup-<run-id>`) به `authorized_keys` سرور خارج اضافه میشود و همان خط دقیقاً ثبت میگردد. در انتهای نصب (موفق یا ناموفق) نصبکننده از طریق SSH همان خط را حذف میکند، فایل را اتمی با مجوز ۶۰۰ مینویسد و سپس با `ssh -o BatchMode=yes` تأیید میکند که کلید موقت دیگر نمیتواند وارد شود. خود کلید موقت هم بدون چاپ شدن حذف میشود.
+- اگر اتصال قطع شود یا scripting متوقف گردد، پاکسازی روی سرور خارج توسط یک واحد `oneshot` محلی (`1mobile-wizard-cleanup.service`) انجام میشود تا کلیدی در سرور خارج باقی نماند.
 - تمام فراخوانیها با argv و `subprocess.run(..., shell=False)` انجام میشوند؛ هیچ رشتهای به shell داده نمیشود.
 - خروجی `ssh` در لاگ پاک میشود تا کلیدها، رمزها و TOTP چاپ نشوند.
 
@@ -79,40 +81,51 @@ sudo bash quick-install.sh
 UDP probe        5355/udp  -> 10.9.0.1
 Jc              0          (کمترین latency handshake)
 
-تغییراتی که قرار است اعمال شود:
-  + IN  tcp  <IP مبدا SSH فعلی>/32  -> port 22     (قبل از هر چیز)
-  + IN  udp  198.51.100.20          -> port 51821
-  + IN  udp  10.9.0.2/32            -> port 5355
+تغییراتی که قرار است اعمال شود (همه با برچسب `1mobile:<run-id>` ثبت میشوند):
+  + iptables -I INPUT  -p tcp -s <IP مبدا SSH فعلی>/32 --dport 22 \
+      -m comment --comment "1mobile:<run-id>:ssh-guard"
+  + iptables -I INPUT  -p udp -s 198.51.100.20 --dport 51821 \
+      -m comment --comment "1mobile:<run-id>:tunnel"
+  + iptables -I INPUT  -p udp -s 10.9.0.2/32 --dport 5355 \
+      -m comment --comment "1mobile:<run-id>:probe"
   + ip addr add 10.9.0.1/30 dev omawg0
   + ip route 10.7.0.0/24 dev omawg0
   + MASQUERADE روی eth0 (فقط سابنت کلاینتها)
 
-بکاپ: /root/1mobile-snapshots/20261126-101500/
-بازگشت: sudo bash quick-install.sh rollback --snapshot 20261126-101500
+لاگ قبل از تغییر (فقط اینکه وضعیت قبل چگونه بود): /root/1mobile-snapshots/<run-id>/
+بازگشت دقیق: sudo bash quick-install.sh rollback --run <run-id>
 
 برای اعمال، دقیقاً تایپ کنید: APPLY
 ```
 
 قواعد سختگیرانه:
 
-1. قبل از اولین تغییر iptables/routing، IP مبدا SSH فعلی در INPUTwhitelist میشود.
+1. قبل از اولین تغییر iptables/routing، IP مبدا SSH فعلی با قانون برچسبخوردهٔ `1mobile:<run-id>:ssh-guard` در INPUTwhitelist میشود.
 2. هیچ `iptables -F`، `ip link del` روی لینکهای موجود و هیچ restart networking وجود ندارد.
 3. اگر سرور دارای `role`، `.conf` یا اینترفیس زنده باشد، wizard متوقف میشود؛ دور زدن فقط با `FORCE_FRESH=1` در آزمایشگاه.
 4. Peerهای زنده با `merge_peers()` حفظ میشوند.
-5. یک «قفل امانت» systemd نصب میشود: اگر نصبکننده ظرف ۱۰ دقیقه heartbeat ندهد، `iptables-restore` و routeهای ذخیرهشده برگردانده میشوند تا SSH باز بماند. پس از موفقیت، قفل خلع سلاح و حذف میشود.
+5. یک «قفل امانت» systemd نصب میشود: اگر نصبکننده ظرف ۱۰ دقیقه heartbeat ندهد، **فقط قوانین برچسبخوردهٔ همان `run-id`** حذف میشوند و route/آدرسی که خود wizard اضافه کرده معکوس میگردد. از `iptables-restore` کلی استفاده نمیشود. پس از موفقیت، قفل خلع سلاح و حذف میشود.
+
+### سیاست Rollback اختصاصی
+
+- هر تغییری که wizard میدهد، هنگام اعمال در `state/<run-id>.json` ثبت میشود: فرمان دقیق `iptables ... -m comment --comment "1mobile:<run-id>:..."`, `ip addr add ...`, `ip route add ...` و مسیر unit مربوطه.
+- Rollback فقط این موارد را با معکوس دقیقشان اجرا میکند (`iptables -D` همان قانون، `ip addr del` همان آدرس، `ip route del` همان route) و قبل از حذف با `iptables -C` / `ip route show` وجودشان را چک میکند.
+- قوانین سرویسهای دیگری (Docker، ufw، firewalld و ...) در فاصله نصب دستنخورده باقی میماند. اگر چنین سرویسی شناسایی شود، wizard قبل از اعمال هشدار میدهد و تأیید جداگانه میخواهد.
+اسنپشات کامل فقط بهعنوان شاهد و برای بازیابی دستی نگه داشته میشوند و هرگز بهصورت خودکار restore نمیشوند.
+- برای عملیات پرخطر (تغییر default route، تغییر پورت SSH، جایگزینی unit متعلق به سرویس دیگری، یا حذف یک قانون خارج از برچسب wizard) علاوه بر `APPLY`، بررسی مجدد اتصال SSH زنده الزامی است: نشان دادن IP مبدا و وضعیت ESTABLISHED و سپس تایپ `CONFIRM`. اگر اتصال SSH از همان مبدا زنده نباشد، عملیات متوقف میشود.
 
 ## ۵) ترتیب اجرا
 
 | مرحله | عملیاتی که اجرا میشود | در صورت شکست |
 |---|---|---|
 | ۱ | تشخیص منابع و IPها، نمایش fingerprint SSH | توقف بدون تغییر |
-| ۲ | پیشنمایش + بکاپ دو سرور | توقف بدون تغییر |
-| ۳ | `deps` + `awg-check` روی هر دو | Rollback مرحلهٔ ۲ |
-| ۴ | `fresh-config init` روی Iran و `fresh-config import` روی Exit از طریق SSH | Rollback |
-| ۵ | `keygen` دو سرور، تبادل فقط `.pub` | Rollback |
-| ۶ | پیکربندی Exit از راه دور، سپس Iran | Rollback + قفل امانت |
-| ۷ | `healthcheck` دو طرف، بررسی handshake و UDP RTT | Rollback |
-| ۸ | پنل + رمز هششده + TOTP، سپس `persist` | Rollback |
+| ۲ | پیشنمایش + ثبت وضعیت قبل بهعنوان شاهد (دو سرور) | توقف بدون تغییر |
+| ۳ | `deps` + `awg-check` روی هر دو | Rollback تغییرات اختصاصی مرحلهٔ ۳ |
+| ۴ | `fresh-config init` روی Iran و `fresh-config import` روی Exit از طریق SSH | Rollback تغییرات اختصاصی |
+| ۵ | `keygen` دو سرور، تبادل فقط `.pub` | Rollback تغییرات اختصاصی |
+| ۶ | پیکربندی Exit از راه دور، سپس Iran | Rollback تغییرات اختصاصی + قفل امانت |
+| ۷ | `healthcheck` دو طرف، بررسی handshake و UDP RTT | Rollback تغییرات اختصاصی |
+| ۸ | پنل + رمز هششده + TOTP، سپس `persist` | Rollback تغییرات اختصاصی |
 | ۹ | تست ساخت کاربر و تأیید اینترنت خروجی طبق TEST-PLAN | علامتگذاری failure در جدول تست |
 
 ## ۶) ساختار فایلهای پیشنهادی
@@ -120,7 +133,8 @@ Jc              0          (کمترین latency handshake)
 ```text
 scripts/quick-install.sh   منو و orchestrator نازک
 src/wizard.py              تشخیص، پیشنمایش، state machine (stdlib)
-src/sshctl.py              پوشش ssh/scp با argv، بدون secret logging
+src/sshctl.py              پوشش ssh/scp با argv، بدون secret logging و لغو کلید موقت
+src/rollbackctl.py         ثبت و معکوسسازی فقط تغییرات برچسبخوردهٔ run-id
 docs/QUICK-INSTALL.md      همین سند
 ```
 
@@ -129,8 +143,10 @@ docs/QUICK-INSTALL.md      همین سند
 ## ۷) معیار قبولی خود wizard
 
 - اجرای بدون `APPLY` هیچ فایلی و هیچ قانون iptables/routeای را تغییر ندهد.
-- اسنپشات شامل تنظیمات کامل شبکه و unitها از هر دو سرور باشد.
-- `rollback --snapshot ...` شبکه را دقیقاً به وضعیت قبل برگرداند و SSH بدون وقفه بماند.
+- اسنپشات فقط شاهد وضعیت قبل از هر دو سرور باشد و بهصورت خودکار restore نشود.
+- `rollback --run <run-id>` فقط قوانین/آدرس/routeهای برچسبخوردهٔ همان اجرا را معکوس کند؛ قانون اضافهشده توسط سرویس دیگری در حین نصب دستنخورده بماند.
+- کلید SSH موقت پس از نصب از `authorized_keys` سرور خارج حذف شود و اتصال با آن کلید ناموفق گردد؛ حتی در مسیر خطا و قطع اتصال.
+- عملیات پرخطر بدون تأیید مجدد `CONFIRM` و اثبات اتصال SSH زنده اجرا نشود.
 - لاگ wizard حاوی هیچ کلید خصوصی، رمز یا TOTP نباشد.
 - پس از اتمام install، دستور `python3 /opt/1mobile-web-v13/healthcheck.py` روی Iran وضعیت `ok` دهد.
 
